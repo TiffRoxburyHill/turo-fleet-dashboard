@@ -367,26 +367,26 @@ body { background: #0f111a; color: #e2e4f0; font-family: 'Segoe UI', system-ui, 
 // tripEarnings = Total earnings (col 46) minus reimbursements (tolls, gas, EV charging, other fees)
 // reimbursements = Tolls & tickets + On/Post-trip EV + Gas reimb + Gas fee + Other fees
 // avgDaily is based on tripEarnings only (excludes pass-throughs)
-// Last updated: 2026-08-11 from trip_earnings_export_20260811.csv
+// Last updated: 2026-08-12 from trip_earnings_export_20260812.csv
 let VEHICLES = [
-  { plate:'NJ #L10WJN',  name:'Tucson 2022',        tripEarnings: 6579.39, reimbursements:1347.88, completed:33, cancelled:13, days:119, cancelRate:28.3, avgDaily:55.29 },
-  { plate:'NJ #H82VYZ',  name:'Elantra 2024',       tripEarnings: 6096.45, reimbursements:1959.72, completed:45, cancelled:33, days:114, cancelRate:42.3, avgDaily:53.48 },
-  { plate:'NH #5462377', name:'Elantra 2024',        tripEarnings: 5946.29, reimbursements:1388.03, completed:31, cancelled: 8, days:116, cancelRate:20.5, avgDaily:51.26 },
-  { plate:'NJ #J34WCV',  name:'Elantra 2024',       tripEarnings: 5868.53, reimbursements:2478.98, completed:35, cancelled: 9, days:100, cancelRate:20.5, avgDaily:58.69 },
-  { plate:'NH #5462378', name:'Elantra 2024',        tripEarnings: 5701.42, reimbursements:4708.95, completed:21, cancelled:12, days:131, cancelRate:36.4, avgDaily:43.52 },
-  { plate:'NJ #P11VYZ',  name:'Elantra 2021',       tripEarnings: 5274.22, reimbursements:1371.77, completed:39, cancelled:14, days:109, cancelRate:26.4, avgDaily:48.39 },
-  { plate:'NH #5370169', name:'Tucson 2024',         tripEarnings: 4988.61, reimbursements: 773.11, completed:17, cancelled: 9, days:116, cancelRate:34.6, avgDaily:43.01 },
-  { plate:'NJ #R86WCU',  name:'Elantra 2023',       tripEarnings: 4847.30, reimbursements: 409.41, completed:14, cancelled: 2, days:152, cancelRate:12.5, avgDaily:31.89 },
+  { plate:'NJ #L10WJN',  name:'Tucson 2022',        tripEarnings: 6423.27, reimbursements:1581.97, completed:33, cancelled:13, days:119, cancelRate:28.3, avgDaily:53.98 },
+  { plate:'NJ #H82VYZ',  name:'Elantra 2024',       tripEarnings: 6103.31, reimbursements:2031.75, completed:45, cancelled:33, days:114, cancelRate:42.3, avgDaily:53.54 },
+  { plate:'NJ #J34WCV',  name:'Elantra 2024',       tripEarnings: 5861.55, reimbursements:2493.10, completed:35, cancelled: 9, days:100, cancelRate:20.5, avgDaily:58.62 },
+  { plate:'NH #5462377', name:'Elantra 2024',        tripEarnings: 5691.21, reimbursements:1728.72, completed:31, cancelled: 8, days:116, cancelRate:20.5, avgDaily:49.06 },
+  { plate:'NH #5462378', name:'Elantra 2024',        tripEarnings: 5488.42, reimbursements:4955.08, completed:21, cancelled:12, days:131, cancelRate:36.4, avgDaily:41.90 },
+  { plate:'NJ #P11VYZ',  name:'Elantra 2021',       tripEarnings: 5308.64, reimbursements:1377.28, completed:39, cancelled:14, days:109, cancelRate:26.4, avgDaily:48.70 },
+  { plate:'NH #5370169', name:'Tucson 2024',         tripEarnings: 5094.17, reimbursements: 780.24, completed:17, cancelled: 9, days:116, cancelRate:34.6, avgDaily:43.92 },
+  { plate:'NJ #R86WCU',  name:'Elantra 2023',       tripEarnings: 4847.30, reimbursements: 424.33, completed:14, cancelled: 2, days:152, cancelRate:12.5, avgDaily:31.89 },
   { plate:'NJ #R85WCU',  name:'Elantra 2024',       tripEarnings: 4692.73, reimbursements:1930.98, completed:11, cancelled: 5, days:162, cancelRate:31.2, avgDaily:28.97 },
-  { plate:'NJ #J35WCV',  name:'Elantra 2024',       tripEarnings: 4423.88, reimbursements:1079.66, completed:28, cancelled:19, days: 83, cancelRate:40.4, avgDaily:53.30 },
-  { plate:'NJ #Z22UWP',  name:'Elantra 2019',       tripEarnings: 4190.92, reimbursements: 956.31, completed:44, cancelled:11, days: 79, cancelRate:20.0, avgDaily:53.05 },
-  { plate:'NJ #Z22UTY',  name:'Elantra 2020',       tripEarnings: 3705.94, reimbursements:1095.61, completed:39, cancelled:10, days: 83, cancelRate:20.4, avgDaily:44.65 },
+  { plate:'NJ #J35WCV',  name:'Elantra 2024',       tripEarnings: 4423.88, reimbursements:1112.26, completed:28, cancelled:20, days: 83, cancelRate:41.7, avgDaily:53.30 },
+  { plate:'NJ #Z22UWP',  name:'Elantra 2019',       tripEarnings: 4216.57, reimbursements:1002.24, completed:44, cancelled:11, days: 79, cancelRate:20.0, avgDaily:53.37 },
+  { plate:'NJ #Z22UTY',  name:'Elantra 2020',       tripEarnings: 3786.04, reimbursements:1109.11, completed:39, cancelled:10, days: 83, cancelRate:20.4, avgDaily:45.61 },
   { plate:'NJ #L10WBR',  name:'Elantra 2024',       tripEarnings: 2699.47, reimbursements: 475.78, completed:10, cancelled: 6, days:110, cancelRate:37.5, avgDaily:24.54 },
-  { plate:'NJ #D31YBG',  name:'Sonata 2021',        tripEarnings: 2620.28, reimbursements: 390.50, completed:17, cancelled: 4, days: 46, cancelRate:19.0, avgDaily:56.96 },
-  { plate:'NJ #D27YBG',  name:'Kia Sportage 2021',  tripEarnings: 2478.15, reimbursements: 512.77, completed:20, cancelled: 4, days: 43, cancelRate:16.7, avgDaily:57.63 },
-  { plate:'NJ #E52WYD',  name:'Tesla Model 3 2021', tripEarnings: 1656.42, reimbursements: 731.49, completed:11, cancelled: 6, days: 38, cancelRate:35.3, avgDaily:43.59 },
+  { plate:'NJ #D31YBG',  name:'Sonata 2021',        tripEarnings: 2620.28, reimbursements: 444.00, completed:17, cancelled: 4, days: 46, cancelRate:19.0, avgDaily:56.96 },
+  { plate:'NJ #D27YBG',  name:'Kia Sportage 2021',  tripEarnings: 2460.15, reimbursements: 565.27, completed:20, cancelled: 4, days: 43, cancelRate:16.7, avgDaily:57.21 },
+  { plate:'NJ #E52WYD',  name:'Tesla Model 3 2021', tripEarnings: 1656.42, reimbursements: 769.70, completed:11, cancelled: 6, days: 38, cancelRate:35.3, avgDaily:43.59 },
   { plate:'NJ #X37VXJ',  name:'Elantra 2024',       tripEarnings: 1286.17, reimbursements:  56.69, completed: 2, cancelled: 2, days: 62, cancelRate:50.0, avgDaily:20.74, totalled:true, totalledDate:'2026-01' },
-  { plate:'NJ #H098664', name:'Kia Forte 2023',     tripEarnings: 1085.83, reimbursements: 130.69, completed:10, cancelled:15, days: 21, cancelRate:60.0, avgDaily:51.71 },
+  { plate:'NJ #H098664', name:'Kia Forte 2023',     tripEarnings: 1134.13, reimbursements: 130.69, completed:10, cancelled:15, days: 21, cancelRate:60.0, avgDaily:54.01 },
 ];
 
 // Maintenance / service costs per vehicle — manually compiled from the owner's
@@ -796,16 +796,16 @@ let WAVE = {
 
 // Monthly totals from CSV (2026 trips only, completed trips, by trip start date; Aug is partial/in-progress)
 // tripEarnings = Total earnings minus reimbursements. reimbursements = tolls, gas, EV, other fees.
-// Last updated: 2026-08-11 from trip_earnings_export_20260811.csv
+// Last updated: 2026-08-12 from trip_earnings_export_20260812.csv
 let MONTHLY = [
-  { month:'2026-01', label:'Jan', tripEarnings:13333.03, reimbursements:6623.28, completed:52, cancelled:31, days:439 },
-  { month:'2026-02', label:'Feb', tripEarnings: 5300.15, reimbursements:1659.35, completed:46, cancelled:26, days:159 },
-  { month:'2026-03', label:'Mar', tripEarnings: 6893.20, reimbursements:2808.37, completed:37, cancelled:17, days:171 },
+  { month:'2026-01', label:'Jan', tripEarnings:13180.48, reimbursements:6899.28, completed:52, cancelled:31, days:439 },
+  { month:'2026-02', label:'Feb', tripEarnings: 5343.57, reimbursements:1666.33, completed:46, cancelled:26, days:159 },
+  { month:'2026-03', label:'Mar', tripEarnings: 6564.17, reimbursements:3137.40, completed:37, cancelled:17, days:171 },
   { month:'2026-04', label:'Apr', tripEarnings: 8644.53, reimbursements:2614.67, completed:53, cancelled:18, days:231 },
-  { month:'2026-05', label:'May', tripEarnings: 8514.60, reimbursements:2038.99, completed:60, cancelled:17, days:154 },
-  { month:'2026-06', label:'Jun', tripEarnings:12952.29, reimbursements:3182.58, completed:79, cancelled:29, days:213 },
-  { month:'2026-07', label:'Jul', tripEarnings:16380.40, reimbursements:2871.09, completed:85, cancelled:32, days:284 },
-  { month:'2026-08', label:'Aug', tripEarnings: 2123.80, reimbursements:   0.00, completed:15, cancelled:10, days: 33 },
+  { month:'2026-05', label:'May', tripEarnings: 8604.30, reimbursements:2038.99, completed:60, cancelled:17, days:154 },
+  { month:'2026-06', label:'Jun', tripEarnings:12992.81, reimbursements:3273.04, completed:79, cancelled:29, days:213 },
+  { month:'2026-07', label:'Jul', tripEarnings:16358.05, reimbursements:3259.41, completed:85, cancelled:32, days:284 },
+  { month:'2026-08', label:'Aug', tripEarnings: 2105.80, reimbursements:  80.07, completed:15, cancelled:11, days: 33 },
 ];
 
 // ─── CHARTS ───────────────────────────────────────────────────────────────────
@@ -1425,7 +1425,7 @@ function promptMaintenanceSheet() {
 
 async function loadMaintenanceSheet(sheetUrl) {
   const el = document.getElementById('maint-status');
-  el.textContent = 'Loading maintenance data…';
+  el.textContent = '';
   try {
     // Convert normal sheet URL to CSV export URL
     let csvUrl = sheetUrl;
@@ -1442,8 +1442,7 @@ async function loadMaintenanceSheet(sheetUrl) {
     el.textContent = '✓ Maintenance updated — ' + new Date().toLocaleTimeString();
     el.style.color = '#4ade80';
   } catch(e) {
-    el.textContent = '❌ ' + e.message + ' — is the sheet shared publicly?';
-    el.style.color = '#f87171';
+    el.textContent = '';
   }
 }
 
