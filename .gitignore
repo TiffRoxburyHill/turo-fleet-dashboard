@@ -1,0 +1,19 @@
+# Secrets
+wave_config.json
+
+# Wave snapshots (contain business financial data)
+wave_snapshots/
+
+# Toll invoice docs (contain guest PII)
+Toll_Invoice_*.docx
+Toll_Trip_Matches_*.csv
+
+# Spreadsheets (local planning files)
+*.xlsx
+
+# Lock files, DS_Store
+.DS_Store
+.~lock.*
+
+# Other docs
+*.docx

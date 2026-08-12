@@ -1,0 +1,1475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>
+(function(){
+  const HASH = '943904d929890033fac3a82c2eb6afe278ab2ae6cdb4f80b08fe6ac0b4f5001c';
+  async function sha256(msg){
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(msg));
+    return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  }
+  async function gate(){
+    if(sessionStorage.getItem('fleet_auth')===HASH) return;
+    // Build overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'auth-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:#0d0f1e;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;font-family:Arial,sans-serif';
+    overlay.innerHTML = `
+      <div style="text-align:center;max-width:340px;width:90%">
+        <div style="font-size:28px;margin-bottom:8px">🚗</div>
+        <div style="color:#7c6af7;font-size:22px;font-weight:700;margin-bottom:4px">Fleet Dashboard</div>
+        <div style="color:#9ba3c8;font-size:13px;margin-bottom:28px">Tiff Roze LLC — Team Access</div>
+        <input id="pw-input" type="password" placeholder="Enter password"
+          style="width:100%;box-sizing:border-box;padding:12px 16px;border-radius:8px;border:1px solid #2a2d4a;background:#1a1d30;color:#fff;font-size:15px;outline:none;margin-bottom:12px"/>
+        <button id="pw-btn"
+          style="width:100%;padding:12px;border-radius:8px;border:none;background:#7c6af7;color:#fff;font-size:15px;font-weight:600;cursor:pointer">
+          Unlock
+        </button>
+        <div id="pw-err" style="color:#f87171;font-size:13px;margin-top:10px;min-height:18px"></div>
+      </div>`;
+    document.body.appendChild(overlay);
+    document.getElementById('pw-input').focus();
+    async function attempt(){
+      const val = document.getElementById('pw-input').value;
+      const h = await sha256(val);
+      if(h===HASH){
+        sessionStorage.setItem('fleet_auth', HASH);
+        overlay.remove();
+      } else {
+        document.getElementById('pw-err').textContent = 'Incorrect password.';
+        document.getElementById('pw-input').value='';
+        document.getElementById('pw-input').focus();
+      }
+    }
+    document.getElementById('pw-btn').addEventListener('click', attempt);
+    document.getElementById('pw-input').addEventListener('keydown', e=>{ if(e.key==='Enter') attempt(); });
+  }
+  document.addEventListener('DOMContentLoaded', gate);
+})();
+</script>
+<title>Tiff Roze LLC — Fleet Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0f111a; color: #e2e4f0; font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; min-height: 100vh; }
+
+/* ── Header ── */
+.header { background: #161928; border-bottom: 1px solid #252840; padding: 16px 28px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.header-title h1 { font-size: 18px; font-weight: 700; letter-spacing: -.3px; }
+.header-title p  { font-size: 12px; color: #6b7094; margin-top: 2px; }
+.upload-btn { display: inline-flex; align-items: center; gap: 7px; background: #5c56e8; color: #fff; border: none; border-radius: 7px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; transition: background .15s; white-space: nowrap; }
+.upload-btn:hover { background: #4a44d4; }
+#file-input { display: none; }
+.upload-note { font-size: 11px; color: #6b7094; }
+#upload-status { font-size: 12px; color: #4ade80; }
+
+/* ── Sources banner ── */
+.sources-bar { background: #13162200; border-bottom: 1px solid #252840; padding: 8px 28px; display: flex; gap: 20px; flex-wrap: wrap; }
+.src-pill { font-size: 11px; background: #1e2235; border: 1px solid #2e3255; border-radius: 20px; padding: 4px 12px; color: #9ba3c8; display: flex; align-items: center; gap: 5px; }
+.src-dot { width: 7px; height: 7px; border-radius: 50%; }
+
+/* ── Layout ── */
+.main { padding: 22px 28px; max-width: 1440px; margin: 0 auto; }
+
+/* ── KPI row ── */
+.kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 22px; }
+.kpi { background: #161928; border: 1px solid #252840; border-radius: 10px; padding: 16px 20px; }
+.kpi-src { font-size: 10px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; margin-bottom: 6px; }
+.kpi-label { font-size: 12px; color: #6b7094; margin-bottom: 5px; }
+.kpi-value { font-size: 28px; font-weight: 700; line-height: 1; }
+.kpi-sub { font-size: 11px; color: #6b7094; margin-top: 5px; }
+.src-turo { color: #7c6af7; }
+.src-bank { color: #2fb8a0; }
+.src-calc  { color: #f0a040; }
+.src-wave  { color: #f0a040; }
+.card-src-wave { background: rgba(240,160,64,.15); color: #f0a040; }
+.src-service  { color: #fb7185; }
+.card-src-service { background: rgba(251,113,133,.15); color: #fb7185; }
+
+/* ── Wave stat tiles ── */
+.wave-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 14px; }
+.wstat { background: #13162280; border: 1px solid #252840; border-radius: 8px; padding: 12px 14px; }
+.wstat-label { font-size: 11px; color: #6b7094; margin-bottom: 4px; }
+.wstat-value { font-size: 20px; font-weight: 700; }
+.wave-warn { font-size: 11px; color: #facc15; background: rgba(250,204,21,.08); border: 1px solid rgba(250,204,21,.25); border-radius: 6px; padding: 8px 12px; margin-bottom: 14px; line-height: 1.5; }
+@media(max-width:900px) { .wave-stats { grid-template-columns: 1fr 1fr; } }
+
+/* ── Section grid ── */
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px; }
+.row3 { display: grid; grid-template-columns: 1fr; gap: 18px; margin-bottom: 18px; }
+.section-label { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #6b7094; margin: 28px 0 14px; padding-bottom: 7px; border-bottom: 1px solid #252840; }
+.section-label:first-of-type { margin-top: 0; }
+
+/* ── Card ── */
+.card { background: #161928; border: 1px solid #252840; border-radius: 10px; padding: 20px; }
+.card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+.card-title { font-size: 13px; font-weight: 600; color: #9ba3c8; text-transform: uppercase; letter-spacing: .5px; display: flex; align-items: center; gap: 7px; }
+.card-src { font-size: 10px; font-weight: 700; letter-spacing: .6px; padding: 2px 8px; border-radius: 4px; }
+.card-src-turo { background: rgba(124,106,247,.15); color: #7c6af7; }
+.card-src-bank { background: rgba(47,184,160,.15); color: #2fb8a0; }
+
+/* ── Chart ── */
+.chart-wrap { position: relative; }
+.chart-wrap canvas { max-height: 280px; }
+.chart-wrap.short canvas { max-height: 220px; }
+.chart-wrap.tall canvas { max-height: 340px; }
+#chart-profitability { max-height: none; }
+
+/* ── Vehicle table ── */
+.vtable { width: 100%; border-collapse: collapse; }
+.vtable th { font-size: 11px; color: #6b7094; text-transform: uppercase; letter-spacing: .5px; padding: 8px 12px; text-align: left; border-bottom: 1px solid #252840; white-space: nowrap; cursor: pointer; user-select: none; }
+.vtable th:hover { color: #c0c6e8; }
+.vtable th.sort-asc::after  { content: ' ↑'; color: #7c6af7; }
+.vtable th.sort-desc::after { content: ' ↓'; color: #7c6af7; }
+.vtable td { padding: 10px 12px; border-bottom: 1px solid #1c1f30; vertical-align: middle; }
+.vtable tr:last-child td { border-bottom: none; }
+.vtable tbody tr:hover td { background: rgba(124,106,247,.04); }
+.plate { font-family: monospace; font-size: 12px; font-weight: 700; background: #1e2235; border: 1px solid #2e3255; border-radius: 5px; padding: 3px 8px; white-space: nowrap; color: #c0c6e8; }
+.model-tag { font-size: 12px; color: #6b7094; }
+.bar-wrap { display: flex; align-items: center; gap: 8px; }
+.bar-bg { background: #1e2235; border-radius: 3px; height: 5px; width: 80px; flex-shrink: 0; }
+.bar-fg { height: 100%; border-radius: 3px; }
+.tag { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px; white-space: nowrap; }
+.tag-green  { background: rgba(74,222,128,.12); color: #4ade80; }
+.tag-yellow { background: rgba(250,204,21,.12); color: #facc15; }
+.tag-red    { background: rgba(248,113,113,.12); color: #f87171; }
+.tag-gray   { background: rgba(107,112,148,.12); color: #6b7094; }
+
+/* ── Month filter tabs ── */
+.month-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.mtab { font-size: 11px; padding: 4px 12px; border-radius: 6px; border: 1px solid #252840; background: transparent; color: #6b7094; cursor: pointer; transition: all .15s; }
+.mtab.active { background: #5c56e8; border-color: #5c56e8; color: #fff; font-weight: 600; }
+.mtab:hover:not(.active) { border-color: #4a4470; color: #c0c6e8; }
+
+/* ── Expense breakdown ── */
+.exp-list { display: flex; flex-direction: column; gap: 11px; }
+.exp-row { display: flex; align-items: center; gap: 10px; }
+.exp-name { font-size: 12px; color: #9ba3c8; width: 150px; flex-shrink: 0; }
+.exp-bar-bg { flex: 1; background: #1e2235; border-radius: 3px; height: 7px; overflow: hidden; }
+.exp-bar-fg { height: 100%; border-radius: 3px; }
+.exp-val { font-size: 12px; font-weight: 600; width: 75px; text-align: right; flex-shrink: 0; }
+
+/* ── Note box ── */
+.note { font-size: 11px; color: #6b7094; background: #13162299; border: 1px solid #252840; border-radius: 6px; padding: 8px 12px; margin-top: 12px; line-height: 1.6; }
+.note strong { color: #9ba3c8; }
+
+/* ── Responsive ── */
+@media(max-width:900px) {
+  .kpi-row { grid-template-columns: 1fr 1fr; }
+  .row2 { grid-template-columns: 1fr; }
+  .main { padding: 14px 14px; }
+}
+@media(max-width:500px) {
+  .kpi-row { grid-template-columns: 1fr; }
+  .kpi-value { font-size: 22px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-title">
+    <h1>Tiff Roze LLC &nbsp;·&nbsp; Fleet Dashboard</h1>
+    <p>Jersey City, NJ &nbsp;·&nbsp; Jan – Aug 2026 &nbsp;·&nbsp; <span id="upload-status">Loaded from saved data</span></p>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <span class="upload-note">Refresh vehicle data →</span>
+    <button class="upload-btn" onclick="document.getElementById('file-input').click()">📂 Load Turo CSV</button>
+    <input type="file" id="file-input" accept=".csv" onchange="handleUpload(event)">
+    <button class="upload-btn" id="maint-btn" onclick="promptMaintenanceSheet()" title="Pull maintenance costs from a public Google Sheet">🔗 Maintenance Sheet</button>
+    <span id="maint-status" style="font-size:11px;color:#6b7094"></span>
+  </div>
+</div>
+
+<!-- Data sources -->
+<div class="sources-bar">
+  <div class="src-pill"><span class="src-dot" style="background:#7c6af7"></span>Turo Trip Export — 2026 trips (Jan–Aug, Aug partial)</div>
+  <div class="src-pill"><span class="src-dot" style="background:#f0a040"></span>Wave Accounting — live, auto-synced weekly</div>
+  <div class="src-pill"><span class="src-dot" style="background:#fb7185"></span>Service Record — maintenance costs only</div>
+</div>
+
+<div class="main">
+
+  <!-- KPI cards -->
+  <div class="kpi-row">
+    <div class="kpi">
+      <div class="kpi-src src-turo">Turo CSV</div>
+      <div class="kpi-label">Trip Earnings YTD</div>
+      <div class="kpi-value" id="kpi-earnings">—</div>
+      <div class="kpi-sub" id="kpi-earnings-sub">—</div>
+      <div class="kpi-sub" id="kpi-reimbursements" style="margin-top:4px;color:#f0a040">—</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-src src-turo">Turo CSV</div>
+      <div class="kpi-label">Days Rented (All Cars)</div>
+      <div class="kpi-value" id="kpi-days">—</div>
+      <div class="kpi-sub" id="kpi-days-sub">—</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-src src-wave">Wave</div>
+      <div class="kpi-label">Current Bank Balance</div>
+      <div class="kpi-value" id="kpi-bank" style="color:#2fb8a0">—</div>
+      <div class="kpi-sub" id="kpi-bank-sub">—</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-src src-turo">Turo CSV</div>
+      <div class="kpi-label">Avg Daily Rate (Fleet)</div>
+      <div class="kpi-value" id="kpi-avgdaily">—</div>
+      <div class="kpi-sub" id="kpi-avgdaily-sub">—</div>
+    </div>
+  </div>
+
+  <div class="section-label">Vehicle Performance</div>
+
+  <!-- Monthly earnings + earnings vs. maintenance per vehicle -->
+  <div class="row2">
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Monthly Trip Earnings <span class="card-src card-src-turo">Turo CSV</span></div>
+        <div class="month-tabs" id="month-tabs-top">
+          <div class="mtab active" data-m="all">All</div>
+          <div class="mtab" data-m="2026-01">Jan</div>
+          <div class="mtab" data-m="2026-02">Feb</div>
+          <div class="mtab" data-m="2026-03">Mar</div>
+          <div class="mtab" data-m="2026-04">Apr</div>
+          <div class="mtab" data-m="2026-05">May</div>
+          <div class="mtab" data-m="2026-06">Jun</div>
+          <div class="mtab" data-m="2026-07">Jul</div>
+          <div class="mtab" data-m="2026-08">Aug ★</div>
+        </div>
+      </div>
+      <div class="chart-wrap"><canvas id="chart-monthly"></canvas></div>
+      <div class="note"><strong>Note:</strong> CSV earnings are recorded on trip <em>start date</em>. Jan is high partly because several Dec trips completed in Jan. Bank deposits reflect when Turo actually paid out, which lags by 1–3 days.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Turo Earnings vs. Maintenance per Vehicle (Year to Date) <span class="card-src card-src-turo">Turo CSV</span><span class="card-src card-src-service">Service Record</span></div>
+      </div>
+      <div class="chart-wrap" id="profitability-chart-wrap" style="height:440px"><canvas id="chart-profitability"></canvas></div>
+      <div class="note"><strong>Note:</strong> Both figures are year-to-date (2026) totals, not a single month. "Maintenance" here is service-record cost only (oil changes, tires, repairs) — not full expenses. See <em>Profitability per Unit</em> below for exact dollar figures, margins, and what this excludes (insurance, loans, parking, tolls, cleaning).</div>
+    </div>
+
+  </div>
+
+  <!-- Days rented + avg daily price per vehicle -->
+  <div class="row2">
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Days Rented per Vehicle <span class="card-src card-src-turo">Turo CSV</span></div>
+      </div>
+      <div class="chart-wrap"><canvas id="chart-days"></canvas></div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Average Daily Price per Vehicle <span class="card-src card-src-turo">Turo CSV</span></div>
+      </div>
+      <div class="chart-wrap"><canvas id="chart-avgdaily"></canvas></div>
+    </div>
+
+  </div>
+
+  <!-- All vehicles table -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">All Vehicles <span class="card-src card-src-turo">Turo CSV</span></div>
+      <span style="font-size:11px;color:#6b7094">Click column headers to sort</span>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="vtable" id="vtable">
+        <thead>
+          <tr>
+            <th data-col="plate">Plate</th>
+            <th data-col="name">Model</th>
+            <th data-col="earnings" class="sort-desc">Total Earnings</th>
+            <th data-col="completed">Trips Done</th>
+            <th data-col="cancelled">Cancelled</th>
+            <th data-col="days">Days Rented</th>
+            <th data-col="avgDaily">Avg / Day</th>
+          </tr>
+        </thead>
+        <tbody id="vtbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Profitability per unit (Turo income vs. service/maintenance cost) -->
+  <div class="card" style="margin-top:18px">
+    <div class="card-header">
+      <div class="card-title">Profitability per Unit <span class="card-src card-src-turo">Turo CSV</span><span class="card-src card-src-service">Service Record</span></div>
+      <span style="font-size:11px;color:#6b7094">Click column headers to sort</span>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="vtable" id="ptable">
+        <thead>
+          <tr>
+            <th data-col="plate">Plate</th>
+            <th data-col="name">Model</th>
+            <th data-col="earnings">Turo Income</th>
+            <th data-col="maintenance">Maintenance</th>
+            <th data-col="insuranceAlloc">Insurance (alloc.)</th>
+            <th data-col="parkingAlloc">Parking (alloc.)</th>
+            <th data-col="net" class="sort-desc">Net</th>
+            <th data-col="margin">Margin</th>
+          </tr>
+        </thead>
+        <tbody id="ptbody"></tbody>
+      </table>
+    </div>
+    <div class="note"><strong>What this shows:</strong> Turo Income is total trip earnings per car, year-to-date (Jan–Aug 2026, from your Turo export). Maintenance is the sum of every logged service event (oil changes, tires, repairs, etc.) per car from your service record spreadsheet, to date. <strong>Insurance (alloc.)</strong> and <strong>Parking (alloc.)</strong> are <span id="p-alloc-summary">—</span>. <strong>Car loan payments are not allocated per car</strong> (Tiff's call) — visible in Wave's expense categories in the Live Financials section below. Net = Income − Maintenance − Insurance alloc. − Parking alloc. <strong>NJ #X37VXJ</strong> was totalled and left the fleet as of Jan 2026 — its historical earnings/costs still show above but it's excluded from the active-fleet split going forward.</div>
+  </div>
+
+  <div class="section-label">Year-over-Year Comparison</div>
+
+  <div class="row2" style="margin-bottom:16px">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Fleet Occupancy % by Month <span class="card-src card-src-turo">Turo CSV</span></div>
+      </div>
+      <div class="note" style="margin-bottom:8px">Days rented ÷ (active cars × days in month). Jan 2026 exceeds 100% because multi-day trips are attributed to their start month. Fleet size grew significantly each year — compare trends, not raw levels. Aug 2026 is partial (through Aug 10).</div>
+      <div class="chart-wrap" style="height:320px"><canvas id="chart-occupancy"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Monthly Trip Earnings by Year <span class="card-src card-src-turo">Turo CSV</span></div>
+      </div>
+      <div class="note" style="margin-bottom:8px">Trip earnings (excl. reimbursements) per month, 2022–2026. Fleet grew from 3 cars (2022) to 18 cars (2026) — the growth in absolute earnings reflects both scale and performance. Aug 2026 is partial.</div>
+      <div class="chart-wrap" style="height:320px"><canvas id="chart-yearlyearnings"></canvas></div>
+    </div>
+  </div>
+
+  <div class="section-label">Live Financials</div>
+
+  <!-- Live financial snapshot, auto-synced -->
+  <div class="card" style="margin-top:18px">
+    <div class="card-header">
+      <div class="card-title">Live Financial Snapshot <span class="card-src card-src-wave">Wave</span></div>
+      <span style="font-size:11px;color:#6b7094" id="wave-synced">Not yet synced</span>
+    </div>
+    <div id="wave-body">
+      <div class="note">This section is updated automatically from your Wave account (Tiff Roze LLC) roughly once a week via a scheduled sync. It hasn't run yet — once it does, you'll see live cash balance and category totals here.</div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+
+<script>
+// ─── STATIC DATA ──────────────────────────────────────────────────────────────
+
+// Vehicle data from Turo CSV (2026 trips only, completed trips only)
+// tripEarnings = Total earnings (col 46) minus reimbursements (tolls, gas, EV charging, other fees)
+// reimbursements = Tolls & tickets + On/Post-trip EV + Gas reimb + Gas fee + Other fees
+// avgDaily is based on tripEarnings only (excludes pass-throughs)
+// Last updated: 2026-08-11 from trip_earnings_export_20260811.csv
+let VEHICLES = [
+  { plate:'NJ #L10WJN',  name:'Tucson 2022',        tripEarnings: 6579.39, reimbursements:1347.88, completed:33, cancelled:13, days:119, cancelRate:28.3, avgDaily:55.29 },
+  { plate:'NJ #H82VYZ',  name:'Elantra 2024',       tripEarnings: 6096.45, reimbursements:1959.72, completed:45, cancelled:33, days:114, cancelRate:42.3, avgDaily:53.48 },
+  { plate:'NH #5462377', name:'Elantra 2024',        tripEarnings: 5946.29, reimbursements:1388.03, completed:31, cancelled: 8, days:116, cancelRate:20.5, avgDaily:51.26 },
+  { plate:'NJ #J34WCV',  name:'Elantra 2024',       tripEarnings: 5868.53, reimbursements:2478.98, completed:35, cancelled: 9, days:100, cancelRate:20.5, avgDaily:58.69 },
+  { plate:'NH #5462378', name:'Elantra 2024',        tripEarnings: 5701.42, reimbursements:4708.95, completed:21, cancelled:12, days:131, cancelRate:36.4, avgDaily:43.52 },
+  { plate:'NJ #P11VYZ',  name:'Elantra 2021',       tripEarnings: 5274.22, reimbursements:1371.77, completed:39, cancelled:14, days:109, cancelRate:26.4, avgDaily:48.39 },
+  { plate:'NH #5370169', name:'Tucson 2024',         tripEarnings: 4988.61, reimbursements: 773.11, completed:17, cancelled: 9, days:116, cancelRate:34.6, avgDaily:43.01 },
+  { plate:'NJ #R86WCU',  name:'Elantra 2023',       tripEarnings: 4847.30, reimbursements: 409.41, completed:14, cancelled: 2, days:152, cancelRate:12.5, avgDaily:31.89 },
+  { plate:'NJ #R85WCU',  name:'Elantra 2024',       tripEarnings: 4692.73, reimbursements:1930.98, completed:11, cancelled: 5, days:162, cancelRate:31.2, avgDaily:28.97 },
+  { plate:'NJ #J35WCV',  name:'Elantra 2024',       tripEarnings: 4423.88, reimbursements:1079.66, completed:28, cancelled:19, days: 83, cancelRate:40.4, avgDaily:53.30 },
+  { plate:'NJ #Z22UWP',  name:'Elantra 2019',       tripEarnings: 4190.92, reimbursements: 956.31, completed:44, cancelled:11, days: 79, cancelRate:20.0, avgDaily:53.05 },
+  { plate:'NJ #Z22UTY',  name:'Elantra 2020',       tripEarnings: 3705.94, reimbursements:1095.61, completed:39, cancelled:10, days: 83, cancelRate:20.4, avgDaily:44.65 },
+  { plate:'NJ #L10WBR',  name:'Elantra 2024',       tripEarnings: 2699.47, reimbursements: 475.78, completed:10, cancelled: 6, days:110, cancelRate:37.5, avgDaily:24.54 },
+  { plate:'NJ #D31YBG',  name:'Sonata 2021',        tripEarnings: 2620.28, reimbursements: 390.50, completed:17, cancelled: 4, days: 46, cancelRate:19.0, avgDaily:56.96 },
+  { plate:'NJ #D27YBG',  name:'Kia Sportage 2021',  tripEarnings: 2478.15, reimbursements: 512.77, completed:20, cancelled: 4, days: 43, cancelRate:16.7, avgDaily:57.63 },
+  { plate:'NJ #E52WYD',  name:'Tesla Model 3 2021', tripEarnings: 1656.42, reimbursements: 731.49, completed:11, cancelled: 6, days: 38, cancelRate:35.3, avgDaily:43.59 },
+  { plate:'NJ #X37VXJ',  name:'Elantra 2024',       tripEarnings: 1286.17, reimbursements:  56.69, completed: 2, cancelled: 2, days: 62, cancelRate:50.0, avgDaily:20.74, totalled:true, totalledDate:'2026-01' },
+  { plate:'NJ #H098664', name:'Kia Forte 2023',     tripEarnings: 1085.83, reimbursements: 130.69, completed:10, cancelled:15, days: 21, cancelRate:60.0, avgDaily:51.71 },
+];
+
+// Maintenance / service costs per vehicle — manually compiled from the owner's
+// service record spreadsheet (sum of every logged service-event cost per car, to date).
+// This is NOT auto-synced; update this object whenever a new service record is uploaded.
+// D27YBG and H098664 are the permanent plates (previously temporary H015124/H015150 —
+// now using permanent plates in Turo as of the Aug 2026 export).
+const MAINTENANCE = {
+  'NJ #R86WCU':  1371.32, // brakes, transmission, engine mount, oil change
+  'NJ #Z22UTY':  1128.00, // tires + rotors + brakes, oil change
+  'NJ #L10WJN':  1636.00, // brake pads + rotors, battery, oil change
+  'NJ #R85WCU':   805.00, // oil filter, rotors, brake pads
+  'NJ #Z22UWP':   215.00, // 3× oil changes
+  'NJ #J34WCV':   175.00, // flat tire repair, oil change
+  'NJ #L10WBR':   155.00, // 2× oil changes
+  'NJ #P11VYZ':   115.00, // light bulb, oil change
+  'NJ #H82VYZ':    85.00, // oil change
+  'NJ #J35WCV':    85.00, // oil change (Apr 2026)
+  'NJ #X37VXJ':    70.00, // oil change
+  'NH #5462377':  280.00, // brakes, 2× oil changes
+  'NH #5462378':    0.00, // no costs logged
+  'NH #5370169':    0.00, // no costs logged
+  'NJ #D27YBG':    0.00,  // Kia Sportage — not in service record yet
+  'NJ #H098664':   0.00,  // Kia Forte — not in service record yet
+  'NJ #D31YBG':    0.00,  // Sonata — not in service record yet
+  'NJ #E52WYD':    0.00,  // Tesla — not in service record yet
+};
+
+// Cars present in the service record with no Turo trips yet (newly acquired / not yet listed)
+// (D31YBG and E52WYD moved to VEHICLES — both now have 2026 trip history)
+const NEW_CARS = [];
+
+// Wave live data — auto-rewritten by wave_sync.py on each scheduled run.
+// WAVE_DATA_START
+let WAVE = {
+  "lastSynced": "2026-08-10T04:11:59.389249+00:00",
+  "accounts": {
+    "bank": [
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTIxMDA3OTY1MzAzO0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Cash on Hand",
+        "subtype": "Cash & Bank",
+        "balance": -10.0
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTYxMDI3OTg4OTg1MTE1O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Clearly Better Business Checking (920)",
+        "subtype": "Cash & Bank",
+        "balance": 3801.48
+      }
+    ],
+    "income": [
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTE3MTQwODE3MDExO0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Gain on Foreign Exchange",
+        "subtype": "Gain on Foreign Exchange",
+        "balance": 0.0
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTc2MjEyNDE4MDQxNzcxO0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Parking spot rental",
+        "subtype": "Income",
+        "balance": 270.0
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTIxMzA5OTU1MjAzO0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Sales",
+        "subtype": "Income",
+        "balance": 0.0
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTc3NzI5MjQ2MTM5ODIxO0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Tiff Roze Car Rental",
+        "subtype": "Income",
+        "balance": 1535.0
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTY1NzI0NjAyODMyNjQ5O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Turo",
+        "subtype": "Income",
+        "balance": 88558.35
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTIxMjY4MDEyMTYxO0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Uncategorized Income",
+        "subtype": "Uncategorized Income",
+        "balance": 311508.44
+      }
+    ],
+    "expense": [
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTIyNTI2MzAzNDE1O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Accounting Fees",
+        "subtype": "Expense",
+        "balance": 0.0
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTIyNTc2NjM1MDY1O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Advertising & Promotion",
+        "subtype": "Expense",
+        "balance": 0.0
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTIyMDE0NTk4MzA1O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Bank Service Charges",
+        "subtype": "Expense",
+        "balance": 0.0
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTIyMDY0OTI5OTU1O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Business Licenses & Permits",
+        "subtype": "Expense",
+        "balance": 0.0
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTgyNzgwNTEzNTU2MjU2O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Car Loan Amex",
+        "subtype": "Expense",
+        "balance": 6101.9
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTgyMjg4NzIzMDIzNDYyO0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Car Loan Blue 2377",
+        "subtype": "Expense",
+        "balance": 3073.4
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTgxOTU1MzU5NzQxMzQ3O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Car Loan Tucson",
+        "subtype": "Expense",
+        "balance": 1517.9
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTc5MjUwMDY3MjE1OTE4O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Car Wash",
+        "subtype": "Expense",
+        "balance": 133.11
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTc3MTU2MDYwOTQzNjQ1O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Citizens Bank Loan",
+        "subtype": "Expense",
+        "balance": 5365.08
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTIxNzM3Nzc0MjI5O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Computer \u2013 Hardware",
+        "subtype": "Expense",
+        "balance": 0.0
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTIxODgwMzgwNTcxO0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Computer \u2013 Hosting",
+        "subtype": "Expense",
+        "balance": 0.0
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTIxODMwMDQ4OTIxO0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Computer \u2013 Internet",
+        "subtype": "Expense",
+        "balance": 0.0
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTIxNzc5NzE3MjcxO0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Computer \u2013 Software",
+        "subtype": "Expense",
+        "balance": 79.2
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTIyMjk5ODEwOTg5O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Depreciation Expense",
+        "subtype": "Expense",
+        "balance": 0.0
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTY5NzM5NzUxMzMxODA0O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "EZ Pass Tolls",
+        "subtype": "Expense",
+        "balance": 9488.41
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTIxNTQ0ODM2MjM3O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Equipment Lease or Rental",
+        "subtype": "Expense",
+        "balance": 0.0
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTIyMTU3MjA0NjQ3O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Insurance \u2013 Vehicles",
+        "subtype": "Expense",
+        "balance": 7308.35
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTIyMTA2ODcyOTk3O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Interest Expense",
+        "subtype": "Expense",
+        "balance": 0.0
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTE3MjE2MzE0NDg1O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Loss on Foreign Exchange",
+        "subtype": "Loss on Foreign Exchange",
+        "balance": 0.0
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTIyMzQxNzU0MDMxO0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Meals and Entertainment",
+        "subtype": "Expense",
+        "balance": 0.0
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTIxNDAyMjI5ODk1O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Merchant Account Fees",
+        "subtype": "Payment Processing Fee",
+        "balance": 0.0
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTY2MzQ3NDY1MzY0NDk3O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Moovetrax Software",
+        "subtype": "Expense",
+        "balance": 892.98
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTIyMTk5MTQ3Njg5O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Office Supplies",
+        "subtype": "Expense",
+        "balance": 97.6
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTYwMDM3Nzk3Njk3MDQxO0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Payroll Employer Taxes",
+        "subtype": "Payroll Expense",
+        "balance": 0.0
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTYwMDM3MzY5ODc4MDI3O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Payroll Gross Pay",
+        "subtype": "Payroll Expense",
+        "balance": 0.0
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTIyMzkyMDg1NjgxO0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Payroll \u2013 Employee Benefits",
+        "subtype": "Payroll Expense",
+        "balance": 0.0
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTIyNDM0MDI4NzIzO0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Payroll \u2013 Employer's Share of Benefits",
+        "subtype": "Payroll Expense",
+        "balance": 0.0
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTIyNDg0MzYwMzczO0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Payroll \u2013 Salary & Wages",
+        "subtype": "Payroll Expense",
+        "balance": 0.0
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTIyNjE4NTc4MTA3O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Professional Fees",
+        "subtype": "Expense",
+        "balance": 0.0
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTIxNDUyNTYxNTQ1O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Purchases \u2013 Parts & Materials",
+        "subtype": "Cost of Goods Sold",
+        "balance": 137.07
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTIxNTk1MTY3ODg3O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Rent Expense",
+        "subtype": "Expense",
+        "balance": 17831.97
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTIxNjQ1NDk5NTM3O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Repairs & Maintenance",
+        "subtype": "Expense",
+        "balance": 584.31
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTIxNjg3NDQyNTc5O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Shop Expense",
+        "subtype": "Expense",
+        "balance": 0.0
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTIyNjY4OTA5NzU3O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Small Tools & Equipment",
+        "subtype": "Expense",
+        "balance": 0.0
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTIxNTAyODkzMTk1O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Subcontracted Services",
+        "subtype": "Cost of Goods Sold",
+        "balance": 5628.0
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTIxOTIyMzIzNjEzO0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Telephone \u2013 Land Line",
+        "subtype": "Expense",
+        "balance": 0.0
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTIxOTcyNjU1MjYzO0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Telephone \u2013 Wireless",
+        "subtype": "Expense",
+        "balance": 0.0
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTIxMzYwMjg2ODUzO0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Uncategorized Expense",
+        "subtype": "Uncategorized Expense",
+        "balance": 341700.95
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTIyNzE5MjQxNDA3O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Uniforms",
+        "subtype": "Expense",
+        "balance": 0.0
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTIyMjQ5NDc5MzM5O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Utilities",
+        "subtype": "Expense",
+        "balance": 0.0
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTgyOTU5MjQxMjM4NDA4O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Vehicle Gasoline",
+        "subtype": "Expense",
+        "balance": 141.87
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTc5OTAzOTAwNDg5NTQ4O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Vehicle Inspection",
+        "subtype": "Expense",
+        "balance": 155.97
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTIyNzYxMTg0NDQ5O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Vehicle \u2013 Fuel",
+        "subtype": "Expense",
+        "balance": 0.0
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTU3OTIyODExNTE2MDk5O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "Vehicle \u2013 Repairs & Maintenance",
+        "subtype": "Expense",
+        "balance": 2139.32
+      },
+      {
+        "id": "QWNjb3VudDoyNDk1OTgxMzk3OTUzNTE2NjkyO0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
+        "name": "transportation",
+        "subtype": "Expense",
+        "balance": 6.0
+      }
+    ]
+  },
+  "weeklyDeltas": [
+    {
+      "weekEnding": "2026-06-26",
+      "incomeDelta": 0.0,
+      "expenseDelta": 0.0
+    },
+    {
+      "weekEnding": "2026-06-30",
+      "incomeDelta": 1679.27,
+      "expenseDelta": 3539.15
+    },
+    {
+      "weekEnding": "2026-07-07",
+      "incomeDelta": 4083.91,
+      "expenseDelta": 6411.66
+    },
+    {
+      "weekEnding": "2026-07-13",
+      "incomeDelta": 3694.41,
+      "expenseDelta": 2956.42
+    },
+    {
+      "weekEnding": "2026-07-20",
+      "incomeDelta": 4041.3,
+      "expenseDelta": 486.58
+    },
+    {
+      "weekEnding": "2026-07-27",
+      "incomeDelta": 4212.44,
+      "expenseDelta": 541.0
+    },
+    {
+      "weekEnding": "2026-08-04",
+      "incomeDelta": 5241.6,
+      "expenseDelta": 7723.52
+    },
+    {
+      "weekEnding": "2026-08-10",
+      "incomeDelta": 3726.55,
+      "expenseDelta": 8788.5
+    }
+  ]
+};
+// WAVE_DATA_END
+
+// Monthly totals from CSV (2026 trips only, completed trips, by trip start date; Aug is partial/in-progress)
+// tripEarnings = Total earnings minus reimbursements. reimbursements = tolls, gas, EV, other fees.
+// Last updated: 2026-08-11 from trip_earnings_export_20260811.csv
+let MONTHLY = [
+  { month:'2026-01', label:'Jan', tripEarnings:13333.03, reimbursements:6623.28, completed:52, cancelled:31, days:439 },
+  { month:'2026-02', label:'Feb', tripEarnings: 5300.15, reimbursements:1659.35, completed:46, cancelled:26, days:159 },
+  { month:'2026-03', label:'Mar', tripEarnings: 6893.20, reimbursements:2808.37, completed:37, cancelled:17, days:171 },
+  { month:'2026-04', label:'Apr', tripEarnings: 8644.53, reimbursements:2614.67, completed:53, cancelled:18, days:231 },
+  { month:'2026-05', label:'May', tripEarnings: 8514.60, reimbursements:2038.99, completed:60, cancelled:17, days:154 },
+  { month:'2026-06', label:'Jun', tripEarnings:12952.29, reimbursements:3182.58, completed:79, cancelled:29, days:213 },
+  { month:'2026-07', label:'Jul', tripEarnings:16380.40, reimbursements:2871.09, completed:85, cancelled:32, days:284 },
+  { month:'2026-08', label:'Aug', tripEarnings: 2123.80, reimbursements:   0.00, completed:15, cancelled:10, days: 33 },
+];
+
+// ─── CHARTS ───────────────────────────────────────────────────────────────────
+
+const C = {
+  purple:'#7c6af7', teal:'#2fb8a0', orange:'#f0a040',
+  red:'#f87171', blue:'#60a5fa', dim:'#6b7094',
+  grid:'rgba(255,255,255,0.04)', text:'#9ba3c8'
+};
+
+let chartMonthly, chartDays, chartAvgDaily;
+
+function $f(n) { return '$'+n.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0}); }
+
+function buildMonthlyChart(filterMonth) {
+  const ctx = document.getElementById('chart-monthly').getContext('2d');
+  if (chartMonthly) chartMonthly.destroy();
+
+  let data, labels;
+  if (!filterMonth || filterMonth==='all') {
+    labels = MONTHLY.map(m=>m.label);
+    data   = MONTHLY.map(m=>m.tripEarnings);
+  } else {
+    // Show top-earning vehicles for that month — placeholder full fleet bar
+    labels = MONTHLY.map(m=>m.label);
+    data   = MONTHLY.map(m=> m.month===filterMonth ? m.tripEarnings : 0);
+  }
+
+  chartMonthly = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels,
+      datasets:[{
+        label:'Trip Earnings',
+        data,
+        backgroundColor: labels.map((_,i)=> data[i]===Math.max(...data) ? C.purple : 'rgba(92,86,232,0.5)'),
+        borderRadius:5,
+        borderSkipped:false,
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:true,
+      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:c=>' '+$f(c.parsed.y) } } },
+      scales:{
+        x:{ grid:{color:C.grid}, ticks:{color:C.text} },
+        y:{ grid:{color:C.grid}, ticks:{color:C.text, callback:v=>'$'+(v/1000).toFixed(0)+'k'}, beginAtZero:true }
+      }
+    }
+  });
+}
+
+function buildDaysChart() {
+  const ctx = document.getElementById('chart-days').getContext('2d');
+  if (chartDays) chartDays.destroy();
+  const sorted = [...VEHICLES].filter(v=>v.days>0).sort((a,b)=>b.days-a.days);
+  chartDays = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: sorted.map(v=>v.plate),
+      datasets:[{
+        label:'Days Rented',
+        data: sorted.map(v=>v.days),
+        backgroundColor: sorted.map(v=> v.days>=90?C.teal : v.days>=60?'rgba(47,184,160,0.55)' : 'rgba(47,184,160,0.3)'),
+        borderRadius:4
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:true,
+      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:c=>' '+c.parsed.y+' days rented' } } },
+      scales:{
+        x:{ grid:{color:C.grid}, ticks:{color:'#c0c6e8', font:{size:10,family:'monospace'}, autoSkip:false, maxRotation:90, minRotation:60} },
+        y:{ grid:{color:C.grid}, ticks:{color:C.text}, beginAtZero:true }
+      }
+    }
+  });
+}
+
+function buildAvgDailyChart() {
+  const ctx = document.getElementById('chart-avgdaily').getContext('2d');
+  if (chartAvgDaily) chartAvgDaily.destroy();
+  const sorted = [...VEHICLES].filter(v=>v.days>0).sort((a,b)=>b.avgDaily-a.avgDaily);
+  chartAvgDaily = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: sorted.map(v=>v.plate),
+      datasets:[{
+        label:'Avg Daily Rate',
+        data: sorted.map(v=>v.avgDaily),
+        backgroundColor: sorted.map(v=> v.avgDaily>=60?C.purple : v.avgDaily>=40?'rgba(124,106,247,0.55)' : 'rgba(124,106,247,0.3)'),
+        borderRadius:4
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:true,
+      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:c=>' $'+c.parsed.y.toFixed(2)+' / day' } } },
+      scales:{
+        x:{ grid:{color:C.grid}, ticks:{color:'#c0c6e8', font:{size:10,family:'monospace'}, autoSkip:false, maxRotation:90, minRotation:60} },
+        y:{ grid:{color:C.grid}, ticks:{color:C.text, callback:v=>'$'+v}, beginAtZero:true }
+      }
+    }
+  });
+}
+
+
+// ─── VEHICLE TABLE ─────────────────────────────────────────────────────────────
+
+let sortCol = 'earnings', sortDir = -1;
+
+function buildTable() {
+  const sorted = [...VEHICLES].sort((a,b)=> (a[sortCol]>b[sortCol]?1:-1)*sortDir );
+
+  document.getElementById('vtbody').innerHTML = sorted.map(v=>{
+    const adTag = v.avgDaily>=60 ? `<span class="tag tag-green">$${v.avgDaily}</span>`
+                : v.avgDaily>=40  ? `<span class="tag tag-yellow">$${v.avgDaily}</span>`
+                :                   `<span style="color:#6b7094">$${v.avgDaily}</span>`;
+    return `<tr${v.totalled?' style="opacity:.6"':''}>
+      <td><span class="plate">${v.plate}</span>${v.totalled?' <span class="tag tag-red" title="Totalled — out of fleet as of '+v.totalledDate+'">Totalled</span>':''}</td>
+      <td><span class="model-tag">${v.name}</span></td>
+      <td style="font-weight:700">$${v.tripEarnings.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+      <td>${v.completed}</td>
+      <td>${v.cancelled}</td>
+      <td>${v.days}d</td>
+      <td>${adTag}</td>
+    </tr>`;
+  }).join('');
+
+  // Update sort headers (scoped to #vtable only — #ptable shares the .vtable class for styling)
+  document.querySelectorAll('#vtable th').forEach(th=>{
+    th.classList.remove('sort-asc','sort-desc');
+    if(th.dataset.col===sortCol) th.classList.add(sortDir===1?'sort-asc':'sort-desc');
+  });
+}
+
+// Sort on header click
+document.querySelector('#vtable thead').addEventListener('click',e=>{
+  const th = e.target.closest('th');
+  if(!th||!th.dataset.col) return;
+  if(sortCol===th.dataset.col) sortDir*=-1;
+  else { sortCol=th.dataset.col; sortDir=-1; }
+  buildTable();
+});
+
+// ─── PROFITABILITY PER UNIT (Turo income vs. service-record maintenance cost) ──
+
+// Fixed-cost allocation: insurance and parking totals from Wave (life-to-date, auto-synced
+// weekly), split evenly across the active fleet (totalled cars excluded).
+// Wave "Insurance – Vehicles" = Roamly premiums; "Rent Expense" = LAZ parking lot.
+// Car loans are NOT allocated per car (Tiff's decision, 2026-06-26: "skip loans for now").
+function getAllocationRates() {
+  const activeFleetCount = VEHICLES.filter(v=>!v.totalled).length + NEW_CARS.length;
+  const waveExp = (WAVE && WAVE.accounts && WAVE.accounts.expense) ? WAVE.accounts.expense : [];
+  const insuranceTotal = (waveExp.find(a=>a.name==='Insurance – Vehicles')||{balance:0}).balance;
+  const parkingTotal   = (waveExp.find(a=>a.name==='Rent Expense')||{balance:0}).balance;
+  return {
+    activeFleetCount,
+    insurancePerVehicle: activeFleetCount>0 ? insuranceTotal/activeFleetCount : 0,
+    parkingPerVehicle:   activeFleetCount>0 ? parkingTotal/activeFleetCount : 0,
+    insuranceTotal, parkingTotal,
+  };
+}
+
+function buildProfitabilityData() {
+  const { insurancePerVehicle, parkingPerVehicle } = getAllocationRates();
+  const rows = VEHICLES.map(v => {
+    const maintenance = MAINTENANCE.hasOwnProperty(v.plate) ? MAINTENANCE[v.plate] : null;
+    const insuranceAlloc = v.totalled ? null : insurancePerVehicle;
+    const parkingAlloc   = v.totalled ? null : parkingPerVehicle;
+    const fixedAlloc = (insuranceAlloc||0) + (parkingAlloc||0);
+    const net = maintenance!==null ? v.tripEarnings - maintenance - fixedAlloc : null;
+    const margin = (maintenance!==null && v.tripEarnings>0) ? (net/v.tripEarnings*100) : null;
+    return { plate:v.plate, name:v.name, earnings:v.tripEarnings, maintenance, insuranceAlloc, parkingAlloc, net, margin, totalled:!!v.totalled };
+  });
+  // NEW_CARS is now empty — all cars have trip history
+  return rows;
+}
+
+let chartProfitability;
+let pSortCol = 'net', pSortDir = -1;
+
+function buildProfitabilityChart(rows) {
+  const ctx = document.getElementById('chart-profitability').getContext('2d');
+  if (chartProfitability) chartProfitability.destroy();
+  const sorted = [...rows].sort((a,b)=>(b.net??-Infinity)-(a.net??-Infinity));
+
+  // Size the wrapper to fit every row — fixes labels getting auto-skipped when
+  // Chart.js doesn't have enough pixel height per category (18 vehicles).
+  const wrap = document.getElementById('profitability-chart-wrap');
+  if (wrap) wrap.style.height = Math.max(360, sorted.length*30) + 'px';
+
+  chartProfitability = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: sorted.map(r=>r.plate),
+      datasets:[
+        { label:'Trip Earnings',     data: sorted.map(r=>r.earnings),         backgroundColor:'rgba(124,106,247,0.75)', borderRadius:3 },
+        { label:'Maintenance Cost', data: sorted.map(r=>-(r.maintenance||0)), backgroundColor:'rgba(248,113,113,0.75)', borderRadius:3 },
+      ]
+    },
+    options:{
+      indexAxis:'y',
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{ labels:{ color:C.text, boxWidth:12 } },
+        tooltip:{ callbacks:{ label:c=>' '+c.dataset.label+': '+$f(Math.abs(c.parsed.x)) } }
+      },
+      scales:{
+        x:{ stacked:false, grid:{color:C.grid}, ticks:{color:C.text, callback:v=>'$'+(v/1000).toFixed(0)+'k'} },
+        y:{ grid:{display:false}, ticks:{color:'#c0c6e8', font:{size:11,family:'monospace'}, autoSkip:false} }
+      }
+    }
+  });
+}
+
+function buildProfitabilityTable() {
+  const rows = buildProfitabilityData();
+  const sorted = [...rows].sort((a,b)=>{
+    const av=a[pSortCol], bv=b[pSortCol];
+    const an = av===null||av===undefined, bn = bv===null||bv===undefined;
+    if(an&&bn) return 0; if(an) return 1; if(bn) return -1;
+    return (av>bv?1:av<bv?-1:0)*pSortDir;
+  });
+
+  document.getElementById('ptbody').innerHTML = sorted.map(r=>{
+    const maintStr = r.maintenance===null ? '<span style="color:#6b7094">no data</span>' : fmtMoney(r.maintenance);
+    const insStr = r.insuranceAlloc===null ? '<span style="color:#6b7094" title="Totalled — excluded from active-fleet split">n/a</span>' : fmtMoney(r.insuranceAlloc);
+    const parkStr = r.parkingAlloc===null ? '<span style="color:#6b7094" title="Totalled — excluded from active-fleet split">n/a</span>' : fmtMoney(r.parkingAlloc);
+    const netStr = r.net===null ? '<span style="color:#6b7094">—</span>' : `<span style="color:${r.net>=0?'#4ade80':'#f87171'}">${fmtMoney(r.net)}</span>`;
+    const marginStr = r.margin===null ? '<span style="color:#6b7094">—</span>'
+      : r.margin>=80 ? `<span class="tag tag-green">${r.margin.toFixed(0)}%</span>`
+      : r.margin>=50 ? `<span class="tag tag-yellow">${r.margin.toFixed(0)}%</span>`
+      : `<span class="tag tag-red">${r.margin.toFixed(0)}%</span>`;
+    return `<tr${r.totalled?' style="opacity:.6"':''}>
+      <td><span class="plate">${r.plate}</span>${r.totalled?' <span class="tag tag-red">Totalled</span>':''}</td>
+      <td><span class="model-tag">${r.name}</span></td>
+      <td style="font-weight:700">${fmtMoney(r.earnings)}</td>
+      <td>${maintStr}</td>
+      <td>${insStr}</td>
+      <td>${parkStr}</td>
+      <td style="font-weight:700">${netStr}</td>
+      <td>${marginStr}</td>
+    </tr>`;
+  }).join('');
+
+  document.querySelectorAll('#ptable th').forEach(th=>{
+    th.classList.remove('sort-asc','sort-desc');
+    if(th.dataset.col===pSortCol) th.classList.add(pSortDir===1?'sort-asc':'sort-desc');
+  });
+
+  const { activeFleetCount, insurancePerVehicle, parkingPerVehicle, insuranceTotal, parkingTotal } = getAllocationRates();
+  const summaryEl = document.getElementById('p-alloc-summary');
+  if (summaryEl) summaryEl.textContent =
+    `the Wave "Insurance – Vehicles" total (${fmtMoney(insuranceTotal)}) and "Rent Expense" total (${fmtMoney(parkingTotal)}) from Wave Accounting, split evenly across the active fleet (${activeFleetCount} cars, totalled cars excluded) — ${fmtMoney(insurancePerVehicle)}/car insurance and ${fmtMoney(parkingPerVehicle)}/car parking. These figures update automatically as Wave syncs weekly.`;
+
+  buildProfitabilityChart(rows);
+}
+
+document.querySelector('#ptable thead').addEventListener('click',e=>{
+  const th = e.target.closest('th');
+  if(!th||!th.dataset.col) return;
+  if(pSortCol===th.dataset.col) pSortDir*=-1;
+  else { pSortCol=th.dataset.col; pSortDir=-1; }
+  buildProfitabilityTable();
+});
+
+// ─── KPI UPDATE ────────────────────────────────────────────────────────────────
+
+function updateKPIs() {
+  const totalE = VEHICLES.reduce((s,v)=>s+v.tripEarnings,0);
+  const totalR = VEHICLES.reduce((s,v)=>s+(v.reimbursements||0),0);
+  const totalD = VEHICLES.reduce((s,v)=>s+v.days,0);
+  const totalC = VEHICLES.reduce((s,v)=>s+v.completed,0);
+  const totalX = VEHICLES.reduce((s,v)=>s+v.cancelled,0);
+  const avgRate = totalD>0 ? totalE/totalD : 0;
+
+  document.getElementById('kpi-earnings').textContent = $f(totalE);
+  document.getElementById('kpi-earnings-sub').textContent = `${totalC} completed · ${totalX} cancelled`;
+  document.getElementById('kpi-reimbursements').textContent = `+ ${$f(totalR)} reimbursements (tolls, gas, EV)`;
+  document.getElementById('kpi-days').textContent = totalD.toLocaleString();
+  document.getElementById('kpi-days-sub').textContent = `avg ${(totalD/Math.max(1,totalC)).toFixed(1)} days per completed trip`;
+  document.getElementById('kpi-avgdaily').textContent = '$'+avgRate.toFixed(2);
+  document.getElementById('kpi-avgdaily-sub').textContent = 'fleet-wide, trip earnings ÷ days rented';
+}
+
+// ─── MONTH TABS ────────────────────────────────────────────────────────────────
+
+document.getElementById('month-tabs-top').addEventListener('click',e=>{
+  const tab = e.target.closest('.mtab');
+  if(!tab) return;
+  document.querySelectorAll('#month-tabs-top .mtab').forEach(t=>t.classList.remove('active'));
+  tab.classList.add('active');
+  buildMonthlyChart(tab.dataset.m);
+});
+
+// ─── CSV UPLOAD ────────────────────────────────────────────────────────────────
+
+function handleUpload(e) {
+  const file = e.target.files[0];
+  if(!file) return;
+  document.getElementById('upload-status').textContent = 'Loading…';
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      parseCSV(ev.target.result);
+      document.getElementById('upload-status').textContent = '✓ '+file.name+' loaded';
+    } catch(err) {
+      document.getElementById('upload-status').textContent = '❌ '+err.message;
+    }
+  };
+  reader.readAsText(file);
+}
+
+function parseCSV(text) {
+  const lines = text.split('\n');
+  const headers = splitCSVLine(lines[0]);
+  const get = (row,h) => { const i=headers.indexOf(h); return i>=0?row[i]:''; };
+  const pm = s => parseFloat((s||'').replace(/[$,\s]/g,'').replace('- ','-'))||0;
+
+  // Reimbursement column names (pass-throughs — no Turo service fee applied)
+  const REIMB_COLS = ['Tolls & tickets','On-trip EV charging','Post-trip EV charging','Gas reimbursement','Gas fee','Other fees'];
+
+  const vmap = {}, mmap = {};
+
+  for(let i=1;i<lines.length;i++){
+    const row = splitCSVLine(lines[i]);
+    if(row.length<10) continue;
+    const vehicle = get(row,'Vehicle');
+    const status  = get(row,'Trip status');
+    const days    = parseInt(get(row,'Trip days'))||0;
+    const totalEarn = pm(get(row,'Total earnings'));
+    const reimb     = REIMB_COLS.reduce((s,h)=>s+pm(get(row,h)),0);
+    const earn      = totalEarn - reimb;
+    const start   = get(row,'Trip start');
+
+    const plateM = vehicle.match(/\(([A-Z]{2} #[A-Z0-9]+)\)/);
+    const plate = plateM ? plateM[1] : vehicle;
+    const nameM = get(row,'Vehicle name');
+
+    if(!vmap[plate]) vmap[plate]={plate,name:nameM,tripEarnings:0,reimbursements:0,completed:0,cancelled:0,days:0,cancelRate:0,avgDaily:0};
+
+    if(start){
+      const d=new Date(start.substring(0,10));
+      if(!isNaN(d)&&d.getFullYear()===2026){
+        const mk=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+        if(status==='Completed'){
+          vmap[plate].tripEarnings+=earn; vmap[plate].reimbursements+=reimb;
+          vmap[plate].completed++; vmap[plate].days+=days;
+          if(!mmap[mk]) mmap[mk]={month:mk,label:d.toLocaleString('en-US',{month:'short'}),tripEarnings:0,reimbursements:0,completed:0,cancelled:0,days:0};
+          mmap[mk].tripEarnings+=earn; mmap[mk].reimbursements+=reimb;
+          mmap[mk].completed++; mmap[mk].days+=days;
+        } else if(status&&status.toLowerCase().includes('cancellation')){
+          vmap[plate].cancelled++;
+          if(!mmap[mk]) mmap[mk]={month:mk,label:d.toLocaleString('en-US',{month:'short'}),tripEarnings:0,reimbursements:0,completed:0,cancelled:0,days:0};
+          mmap[mk].cancelled++;
+        }
+      }
+    } else {
+      if(status==='Completed'){
+        vmap[plate].tripEarnings+=earn; vmap[plate].reimbursements+=reimb;
+        vmap[plate].completed++; vmap[plate].days+=days;
+      } else if(status&&status.toLowerCase().includes('cancellation')){
+        vmap[plate].cancelled++;
+      }
+    }
+  }
+
+  Object.values(vmap).forEach(v=>{
+    const t=v.completed+v.cancelled;
+    v.cancelRate=t>0?Math.round(v.cancelled/t*1000)/10:0;
+    v.avgDaily=v.days>0?Math.round(v.tripEarnings/v.days*100)/100:0;
+  });
+
+  VEHICLES = Object.values(vmap).filter(v=>v.completed+v.cancelled>0).sort((a,b)=>b.tripEarnings-a.tripEarnings);
+  MONTHLY  = Object.values(mmap).filter(m=>m.month>='2026-01'&&m.month<='2026-12'&&(m.completed>0||m.cancelled>0)).sort((a,b)=>a.month>b.month?1:-1);
+
+  renderAll();
+}
+
+function splitCSVLine(line){
+  const r=[]; let q=false, v='';
+  for(let i=0;i<line.length;i++){
+    if(line[i]==='"'){q=!q;}
+    else if(line[i]===','&&!q){r.push(v.trim());v='';}
+    else{v+=line[i];}
+  }
+  r.push(v.trim()); return r;
+}
+
+// ─── RENDER ALL ────────────────────────────────────────────────────────────────
+
+
+function fmtMoney(n){ return '$'+Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+function renderWave(){
+  const synced = document.getElementById('wave-synced');
+  const body = document.getElementById('wave-body');
+  const bankKpi = document.getElementById('kpi-bank');
+  const bankKpiSub = document.getElementById('kpi-bank-sub');
+
+  if(!WAVE){
+    if(bankKpi) bankKpi.textContent = 'No sync yet';
+    if(bankKpiSub) bankKpiSub.textContent = 'run the weekly Wave sync to populate';
+    return; // leave the default "not yet synced" message
+  }
+
+  const cashNow = WAVE.accounts.bank.reduce((s,a)=>s+a.balance,0);
+  if(bankKpi) bankKpi.textContent = fmtMoney(cashNow);
+  if(bankKpiSub) bankKpiSub.textContent = 'as of ' + new Date(WAVE.lastSynced).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+
+  synced.textContent = 'Last synced: ' + new Date(WAVE.lastSynced).toLocaleString('en-US',{dateStyle:'medium',timeStyle:'short'});
+
+  const cash = WAVE.accounts.bank.reduce((s,a)=>s+a.balance,0);
+  const incomeCat = WAVE.accounts.income.filter(a=>!/uncategorized/i.test(a.name));
+  const expenseCat = WAVE.accounts.expense.filter(a=>!/uncategorized/i.test(a.name));
+  const incomeUncat = WAVE.accounts.income.find(a=>/uncategorized/i.test(a.name));
+  const expenseUncat = WAVE.accounts.expense.find(a=>/uncategorized/i.test(a.name));
+  const totalIncomeCat = incomeCat.reduce((s,a)=>s+a.balance,0);
+  const totalExpenseCat = expenseCat.reduce((s,a)=>s+a.balance,0);
+
+  let html = '';
+
+  html += '<div class="wave-stats">';
+  html += `<div class="wstat"><div class="wstat-label">Live Bank + Cash Balance</div><div class="wstat-value" style="color:#2fb8a0">${fmtMoney(cash)}</div></div>`;
+  html += `<div class="wstat"><div class="wstat-label">Categorized Income (life-to-date)</div><div class="wstat-value" style="color:#7c6af7">${fmtMoney(totalIncomeCat)}</div></div>`;
+  html += `<div class="wstat"><div class="wstat-label">Categorized Expense (life-to-date)</div><div class="wstat-value" style="color:#f87171">${fmtMoney(totalExpenseCat)}</div></div>`;
+  html += `<div class="wstat"><div class="wstat-label">Net (categorized only)</div><div class="wstat-value" style="color:${totalIncomeCat-totalExpenseCat>=0?'#4ade80':'#f87171'}">${fmtMoney(totalIncomeCat-totalExpenseCat)}</div></div>`;
+  html += '</div>';
+
+  if(incomeUncat || expenseUncat){
+    html += `<div class="wave-warn"><strong>Heads up:</strong> Uncategorized Income (${fmtMoney(incomeUncat?incomeUncat.balance:0)}) and Uncategorized Expense (${fmtMoney(expenseUncat?expenseUncat.balance:0)}) in Wave are larger than your categorized totals. Categorizing transactions in Wave will make these numbers much more meaningful.</div>`;
+  }
+
+  html += '<div class="row2" style="margin-bottom:0">';
+  html += '<div><div class="card-title" style="margin-bottom:10px">Top Income Categories</div><div class="exp-list">';
+  incomeCat.slice().sort((a,b)=>b.balance-a.balance).slice(0,6).forEach(a=>{
+    const max = Math.max(...incomeCat.map(x=>x.balance),1);
+    html += `<div class="exp-row"><div class="exp-name">${a.name}</div><div class="exp-bar-bg"><div class="exp-bar-fg" style="width:${a.balance/max*100}%;background:#7c6af7"></div></div><div class="exp-val">${fmtMoney(a.balance)}</div></div>`;
+  });
+  html += '</div></div>';
+  html += '<div><div class="card-title" style="margin-bottom:10px">Top Expense Categories</div><div class="exp-list">';
+  expenseCat.slice().sort((a,b)=>b.balance-a.balance).slice(0,6).forEach(a=>{
+    const max = Math.max(...expenseCat.map(x=>x.balance),1);
+    html += `<div class="exp-row"><div class="exp-name">${a.name}</div><div class="exp-bar-bg"><div class="exp-bar-fg" style="width:${a.balance/max*100}%;background:#f87171"></div></div><div class="exp-val">${fmtMoney(a.balance)}</div></div>`;
+  });
+  html += '</div></div>';
+  html += '</div>';
+
+  if(WAVE.weeklyDeltas && WAVE.weeklyDeltas.length>1){
+    html += '<div style="margin-top:16px"><div class="card-title" style="margin-bottom:10px">Weekly Net Change (Income − Expense, since last sync)</div><div class="chart-wrap short"><canvas id="chart-wave-weekly"></canvas></div></div>';
+  }
+
+  body.innerHTML = html;
+
+  if(WAVE.weeklyDeltas && WAVE.weeklyDeltas.length>1){
+    new Chart(document.getElementById('chart-wave-weekly'), {
+      type:'bar',
+      data:{
+        labels: WAVE.weeklyDeltas.map(w=>w.weekEnding),
+        datasets:[{ label:'Net change', data: WAVE.weeklyDeltas.map(w=>w.incomeDelta-w.expenseDelta),
+          backgroundColor: WAVE.weeklyDeltas.map(w=> (w.incomeDelta-w.expenseDelta)>=0 ? '#4ade80' : '#f87171') }]
+      },
+      options:{ plugins:{legend:{display:false}}, scales:{ y:{ ticks:{color:'#6b7094'}, grid:{color:'#1c1f30'} }, x:{ ticks:{color:'#6b7094'}, grid:{display:false} } } }
+    });
+  }
+}
+
+// ─── HISTORICAL DATA (2022–2026, all years, completed trips only) ─────────────
+// Occupancy = days rented ÷ (active_cars_that_month × days_in_month) × 100
+// null = no data for that month in that year
+const HISTORICAL = {
+  occupancy: {
+    '2022': [null,null,null,null,null,null,null, 19.4, 43.3, 35.5, 47.8, 22.6],
+    '2023': [11.8, 16.7, 17.7, 46.7, 35.5, 40.0, 59.7, 48.4, 31.7, 40.3, 51.7, 43.5],
+    '2024': [24.2, 31.0, 33.9, 40.0, 46.8, 61.7, 50.0, 70.6, 55.0, 57.3, 62.1, 45.6],
+    '2025': [46.0, 54.0, 62.1, 52.1, 76.6, 51.0, 55.1, 54.6, 37.9, 46.7, 51.0, 42.7],
+    '2026': [100,  51.6, 50.1, 64.2, 31.0, 44.4, 53.9,  7.1, null, null, null, null],
+  },
+  earnings: {
+    '2022': [null,   null,   null,   null,   null,   null,   null,    336,  1702,  2552,  2510,  1229],
+    '2023': [ 861,    772,    611,   1459,   1364,   1547,   2413,   1789,  1137,  1336,  1576,  1552],
+    '2024': [ 729,    946,   1155,   1166,   1397,   1942,   3163,   8599,  6217,  6546,  7320,  5831],
+    '2025': [5264,   5789,   7359,   6348,  10724,   9132,  12798,  12799,  6802, 10180,  9803,  8408],
+    '2026': [13333,  5293,   6743,   8645,   8515,  12880,  16358,   2124,  null,  null,  null,  null],
+  },
+};
+
+const YEAR_COLORS = {
+  '2022': { color:'#888888', bg:'rgba(136,136,136,0.15)' },
+  '2023': { color:'#60a5fa', bg:'rgba(96,165,250,0.15)'  },
+  '2024': { color:'#2fb8a0', bg:'rgba(47,184,160,0.15)'  },
+  '2025': { color:'#f0a040', bg:'rgba(240,160,64,0.15)'  },
+  '2026': { color:'#7c6af7', bg:'rgba(124,106,247,0.20)' },
+};
+const MONTH_LABELS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+let chartOccupancy, chartYearlyEarnings;
+
+function buildOccupancyChart() {
+  const ctx = document.getElementById('chart-occupancy').getContext('2d');
+  if (chartOccupancy) chartOccupancy.destroy();
+  const datasets = Object.entries(HISTORICAL.occupancy).map(([year, data]) => ({
+    label: year,
+    data,
+    borderColor: YEAR_COLORS[year].color,
+    backgroundColor: YEAR_COLORS[year].bg,
+    borderWidth: year === '2026' ? 2.5 : 1.5,
+    borderDash: year === '2026' ? [] : [5, 4],
+    pointRadius: 4,
+    pointHoverRadius: 6,
+    pointBackgroundColor: YEAR_COLORS[year].color,
+    tension: 0.3,
+    spanGaps: false,
+  }));
+  chartOccupancy = new Chart(ctx, {
+    type: 'line',
+    data: { labels: MONTH_LABELS_SHORT, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode:'index', intersect:false },
+      plugins: {
+        legend: { position:'top', labels:{ color:C.text, font:{family:'Arial',size:11}, boxWidth:24, padding:12 } },
+        tooltip: {
+          callbacks: {
+            label: ctx => ctx.parsed.y !== null ? ` ${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}%` : null,
+          }
+        }
+      },
+      scales: {
+        x: { ticks:{color:C.text,font:{size:11}}, grid:{color:C.grid} },
+        y: {
+          ticks: { color:C.text, font:{size:11}, callback: v => v+'%' },
+          grid: { color:C.grid },
+          min: 0, suggestedMax: 100,
+          title: { display:true, text:'Occupancy %', color:C.text, font:{size:11} },
+        }
+      }
+    }
+  });
+}
+
+function buildYearlyEarningsChart() {
+  const ctx = document.getElementById('chart-yearlyearnings').getContext('2d');
+  if (chartYearlyEarnings) chartYearlyEarnings.destroy();
+  const datasets = Object.entries(HISTORICAL.earnings).map(([year, data]) => ({
+    label: year,
+    data,
+    borderColor: YEAR_COLORS[year].color,
+    backgroundColor: YEAR_COLORS[year].bg,
+    borderWidth: year === '2026' ? 2.5 : 1.5,
+    borderDash: year === '2026' ? [] : [5, 4],
+    pointRadius: 4,
+    pointHoverRadius: 6,
+    pointBackgroundColor: YEAR_COLORS[year].color,
+    tension: 0.3,
+    spanGaps: false,
+    fill: false,
+  }));
+  chartYearlyEarnings = new Chart(ctx, {
+    type: 'line',
+    data: { labels: MONTH_LABELS_SHORT, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode:'index', intersect:false },
+      plugins: {
+        legend: { position:'top', labels:{ color:C.text, font:{family:'Arial',size:11}, boxWidth:24, padding:12 } },
+        tooltip: {
+          callbacks: {
+            label: ctx => ctx.parsed.y !== null
+              ? ` ${ctx.dataset.label}: $${ctx.parsed.y.toLocaleString('en-US',{maximumFractionDigits:0})}`
+              : null,
+          }
+        }
+      },
+      scales: {
+        x: { ticks:{color:C.text,font:{size:11}}, grid:{color:C.grid} },
+        y: {
+          ticks: {
+            color:C.text, font:{size:11},
+            callback: v => '$'+( v>=1000 ? (v/1000).toFixed(0)+'k' : v ),
+          },
+          grid: { color:C.grid },
+          min: 0,
+          title: { display:true, text:'Trip Earnings ($)', color:C.text, font:{size:11} },
+        }
+      }
+    }
+  });
+}
+
+function renderAll(){
+  updateKPIs();
+  buildMonthlyChart('all');
+  buildDaysChart();
+  buildAvgDailyChart();
+  buildTable();
+  buildProfitabilityTable();
+  buildOccupancyChart();
+  buildYearlyEarningsChart();
+  renderWave();
+}
+
+renderAll();
+
+// ─── GOOGLE SHEETS MAINTENANCE AUTO-FETCH ────────────────────────────────────
+// Expects a public Google Sheet with columns "Plate" and "Cost" (header row 1).
+// Share the sheet → "Anyone with link can view", then paste the URL here.
+// The export URL is derived automatically from the spreadsheet URL.
+
+const MAINT_KEY = 'turo_maintenance_sheet_url';
+
+function promptMaintenanceSheet() {
+  const saved = localStorage.getItem(MAINT_KEY) || '';
+  const url = window.prompt('Paste your Google Sheets URL (must be shared publicly):\n\nExpected columns: Plate, Cost', saved);
+  if (!url) return;
+  localStorage.setItem(MAINT_KEY, url);
+  loadMaintenanceSheet(url);
+}
+
+async function loadMaintenanceSheet(sheetUrl) {
+  const el = document.getElementById('maint-status');
+  el.textContent = 'Loading maintenance data…';
+  try {
+    // Convert normal sheet URL to CSV export URL
+    let csvUrl = sheetUrl;
+    const idMatch = sheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+    if (idMatch) {
+      const gidMatch = sheetUrl.match(/[?&]gid=(\d+)/);
+      const gid = gidMatch ? '&gid='+gidMatch[1] : '';
+      csvUrl = `https://docs.google.com/spreadsheets/d/${idMatch[1]}/export?format=csv${gid}`;
+    }
+    const resp = await fetch(csvUrl);
+    if (!resp.ok) throw new Error('HTTP '+resp.status);
+    const text = await resp.text();
+    applyMaintenanceCSV(text);
+    el.textContent = '✓ Maintenance updated — ' + new Date().toLocaleTimeString();
+    el.style.color = '#4ade80';
+  } catch(e) {
+    el.textContent = '❌ ' + e.message + ' — is the sheet shared publicly?';
+    el.style.color = '#f87171';
+  }
+}
+
+function applyMaintenanceCSV(text) {
+  const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
+  if (!lines.length) return;
+  const headers = splitCSVLine(lines[0]).map(h=>h.trim().toLowerCase());
+  const plateIdx = headers.findIndex(h=>h==='plate');
+  const costIdx  = headers.findIndex(h=>h==='cost'||h==='maintenance'||h==='amount');
+  if (plateIdx<0 || costIdx<0) throw new Error('Sheet must have "Plate" and "Cost" columns');
+  for (let i=1; i<lines.length; i++) {
+    const row = splitCSVLine(lines[i]);
+    const plate = (row[plateIdx]||'').trim();
+    const cost  = parseFloat((row[costIdx]||'').replace(/[$,]/g,'')) || 0;
+    if (plate) MAINTENANCE[plate] = cost;
+  }
+  buildProfitabilityTable();
+}
+
+// On page load: auto-fetch maintenance from Google Sheet (falls back to localStorage if overridden)
+const DEFAULT_MAINT_URL = 'https://docs.google.com/spreadsheets/d/11qickieom6EsjrpsAgxKH6XUUNgNgKQW8DdKb-hWFxw/export?format=csv&gid=12435260';
+(function() {
+  const saved = localStorage.getItem(MAINT_KEY) || DEFAULT_MAINT_URL;
+  loadMaintenanceSheet(saved);
+})();
+
+</script>
+</body>
+</html>
