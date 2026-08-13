@@ -34,7 +34,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(SCRIPT_DIR, "wave_config.json")
 SNAPSHOT_DIR = os.path.join(SCRIPT_DIR, "wave_snapshots")
 HISTORY_PATH = os.path.join(SNAPSHOT_DIR, "history.json")
-DASHBOARD_PATH = os.path.join(SCRIPT_DIR, "fleet_dashboard_v2.html")
+DASHBOARD_PATH = os.path.join(SCRIPT_DIR, "index.html")
 
 GRAPHQL_URL = "https://gql.waveapps.com/graphql/public"
 
