@@ -74,7 +74,7 @@ body { background: #0f111a; color: #e2e4f0; font-family: 'Segoe UI', system-ui, 
 .main { padding: 22px 28px; max-width: 1440px; margin: 0 auto; }
 
 /* ── KPI row ── */
-.kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 22px; }
+.kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 22px; }
 .kpi { background: #161928; border: 1px solid #252840; border-radius: 10px; padding: 16px 20px; }
 .kpi-src { font-size: 10px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; margin-bottom: 6px; }
 .kpi-label { font-size: 12px; color: #6b7094; margin-bottom: 5px; }
@@ -179,8 +179,6 @@ body { background: #0f111a; color: #e2e4f0; font-family: 'Segoe UI', system-ui, 
     <span class="upload-note">Refresh vehicle data →</span>
     <button class="upload-btn" onclick="document.getElementById('file-input').click()">📂 Load Turo CSV</button>
     <input type="file" id="file-input" accept=".csv" onchange="handleUpload(event)">
-    <button class="upload-btn" onclick="promptTripCSV()" title="Link a Google Sheet with your Turo trip export for live updates">🔗 Trip Data Sheet</button>
-    <span id="trip-csv-status" style="font-size:11px;color:#6b7094"></span>
     <button class="upload-btn" id="maint-btn" onclick="promptMaintenanceSheet()" title="Pull maintenance costs from a public Google Sheet">🔗 Maintenance Sheet</button>
     <span id="maint-status" style="font-size:11px;color:#6b7094"></span>
   </div>
@@ -189,7 +187,7 @@ body { background: #0f111a; color: #e2e4f0; font-family: 'Segoe UI', system-ui, 
 <!-- Data sources -->
 <div class="sources-bar">
   <div class="src-pill"><span class="src-dot" style="background:#7c6af7"></span>Turo Trip Export — 2026 trips (Jan–Aug, Aug partial)</div>
-  <div class="src-pill"><span class="src-dot" style="background:#f0a040"></span>Wave Accounting — live, auto-synced weekly</div>
+  <div class="src-pill"><span class="src-dot" style="background:#f0a040"></span>Wave Accounting — synced Aug 13, 2026</div>
   <div class="src-pill"><span class="src-dot" style="background:#fb7185"></span>Service Record — maintenance costs only</div>
 </div>
 
@@ -199,10 +197,16 @@ body { background: #0f111a; color: #e2e4f0; font-family: 'Segoe UI', system-ui, 
   <div class="kpi-row">
     <div class="kpi">
       <div class="kpi-src src-turo">Turo CSV</div>
-      <div class="kpi-label">Trip Earnings YTD</div>
-      <div class="kpi-value" id="kpi-earnings">—</div>
+      <div class="kpi-label">Earned YTD</div>
+      <div class="kpi-value" id="kpi-earnings" style="color:#4ade80">—</div>
       <div class="kpi-sub" id="kpi-earnings-sub">—</div>
       <div class="kpi-sub" id="kpi-reimbursements" style="margin-top:4px;color:#f0a040">—</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-src src-turo">Turo CSV</div>
+      <div class="kpi-label">Upcoming Income</div>
+      <div class="kpi-value" id="kpi-booked" style="color:#7c6af7">—</div>
+      <div class="kpi-sub" id="kpi-booked-sub">—</div>
     </div>
     <div class="kpi">
       <div class="kpi-src src-turo">Turo CSV</div>
@@ -366,28 +370,28 @@ body { background: #0f111a; color: #e2e4f0; font-family: 'Segoe UI', system-ui, 
 // ─── STATIC DATA ──────────────────────────────────────────────────────────────
 
 // Vehicle data from Turo CSV (2026 trips, Completed + Booked/confirmed upcoming)
-// tripEarnings = Total earnings minus full reimbursements — matches Turo's "Trip earnings" reporting
-// Includes confirmed booked trips to align with Turo UI ($83,123 vs Turo's $82,338)
+// completedEarnings = already earned (Completed trips + cancellation fees); bookedEarnings = confirmed upcoming
+// tripEarnings = completedEarnings + bookedEarnings (used by charts for total)
 // Last updated: 2026-08-12 from trip_earnings_export_20260812.csv
 let VEHICLES = [
-  { plate:'NJ #L10WJN',  name:'Tucson 2022',        tripEarnings: 7574.28, reimbursements:1269.73, completed:33, cancelled:13, days:132, cancelRate:28.3, avgDaily:57.38 },
-  { plate:'NH #5370169', name:'Tucson 2024',         tripEarnings: 7237.61, reimbursements: 780.24, completed:17, cancelled: 9, days:153, cancelRate:34.6, avgDaily:47.30 },
-  { plate:'NJ #H82VYZ',  name:'Elantra 2024',       tripEarnings: 6848.27, reimbursements:1980.67, completed:45, cancelled:33, days:125, cancelRate:42.3, avgDaily:54.79 },
-  { plate:'NH #5462377', name:'Elantra 2024',        tripEarnings: 6305.47, reimbursements:1565.16, completed:31, cancelled: 8, days:123, cancelRate:20.5, avgDaily:51.26 },
-  { plate:'NH #5462378', name:'Elantra 2024',        tripEarnings: 6160.25, reimbursements:4955.08, completed:21, cancelled:12, days:140, cancelRate:36.4, avgDaily:44.00 },
-  { plate:'NJ #J34WCV',  name:'Elantra 2024',       tripEarnings: 5875.51, reimbursements:2479.14, completed:35, cancelled: 9, days:100, cancelRate:20.5, avgDaily:58.76 },
-  { plate:'NJ #P11VYZ',  name:'Elantra 2021',       tripEarnings: 5657.17, reimbursements:1377.28, completed:39, cancelled:14, days:116, cancelRate:26.4, avgDaily:48.77 },
-  { plate:'NJ #R86WCU',  name:'Elantra 2023',       tripEarnings: 5267.96, reimbursements: 424.33, completed:14, cancelled: 2, days:158, cancelRate:12.5, avgDaily:33.34 },
-  { plate:'NJ #R85WCU',  name:'Elantra 2024',       tripEarnings: 5054.48, reimbursements:1930.98, completed:11, cancelled: 5, days:170, cancelRate:31.2, avgDaily:29.73 },
-  { plate:'NJ #Z22UWP',  name:'Elantra 2019',       tripEarnings: 5014.26, reimbursements:1002.24, completed:44, cancelled:11, days: 95, cancelRate:20.0, avgDaily:52.78 },
-  { plate:'NJ #J35WCV',  name:'Elantra 2024',       tripEarnings: 4744.91, reimbursements:1112.26, completed:28, cancelled:20, days: 90, cancelRate:41.7, avgDaily:52.72 },
-  { plate:'NJ #Z22UTY',  name:'Elantra 2020',       tripEarnings: 4038.04, reimbursements:1109.11, completed:39, cancelled:10, days: 87, cancelRate:20.4, avgDaily:46.41 },
-  { plate:'NJ #D27YBG',  name:'Kia Sportage 2021',  tripEarnings: 3013.74, reimbursements: 565.27, completed:20, cancelled: 4, days: 52, cancelRate:16.7, avgDaily:57.96 },
-  { plate:'NJ #L10WBR',  name:'Elantra 2024',       tripEarnings: 2699.47, reimbursements: 475.78, completed:10, cancelled: 6, days:110, cancelRate:37.5, avgDaily:24.54 },
-  { plate:'NJ #D31YBG',  name:'Sonata 2021',        tripEarnings: 2620.28, reimbursements: 444.00, completed:17, cancelled: 4, days: 46, cancelRate:19.0, avgDaily:56.96 },
-  { plate:'NJ #E52WYD',  name:'Tesla Model 3 2021', tripEarnings: 2451.48, reimbursements: 769.70, completed:11, cancelled: 6, days: 58, cancelRate:35.3, avgDaily:42.27 },
-  { plate:'NJ #X37VXJ',  name:'Elantra 2024',       tripEarnings: 1286.17, reimbursements:  56.69, completed: 2, cancelled: 2, days: 62, cancelRate:50.0, avgDaily:20.74, totalled:true, totalledDate:'2026-01' },
-  { plate:'NJ #H098664', name:'Kia Forte 2023',     tripEarnings: 1274.18, reimbursements: 130.69, completed:10, cancelled:15, days: 24, cancelRate:60.0, avgDaily:53.09 },
+  { plate:'NJ #L10WJN',  name:'Tucson 2022',        completedEarnings: 6864.21, bookedEarnings:  838.77, tripEarnings: 7702.98, reimbursements:1289.95, completed:34, booked:5, cancelled:13, days:134, cancelRate:27.7, avgDaily:57.48 },
+  { plate:'NH #5462377', name:'Elantra 2024',        completedEarnings: 7074.54, bookedEarnings:  450.70, tripEarnings: 7525.24, reimbursements:1993.29, completed:32, booked:2, cancelled: 8, days:144, cancelRate:20.0, avgDaily:52.26 },
+  { plate:'NH #5370169', name:'Tucson 2024',         completedEarnings: 5094.17, bookedEarnings: 2143.44, tripEarnings: 7237.61, reimbursements: 780.24, completed:17, booked:8, cancelled: 9, days:153, cancelRate:34.6, avgDaily:47.30 },
+  { plate:'NJ #H82VYZ',  name:'Elantra 2024',        completedEarnings: 6154.39, bookedEarnings:  693.88, tripEarnings: 6848.27, reimbursements:1980.67, completed:45, booked:4, cancelled:33, days:125, cancelRate:42.3, avgDaily:54.79 },
+  { plate:'NH #5462378', name:'Elantra 2024',        completedEarnings: 5564.02, bookedEarnings:  671.83, tripEarnings: 6235.85, reimbursements:5075.90, completed:22, booked:4, cancelled:12, days:141, cancelRate:35.3, avgDaily:44.23 },
+  { plate:'NJ #P11VYZ',  name:'Elantra 2021',        completedEarnings: 5628.81, bookedEarnings:  348.53, tripEarnings: 5977.34, reimbursements:1471.17, completed:40, booked:2, cancelled:14, days:126, cancelRate:25.9, avgDaily:47.44 },
+  { plate:'NJ #J34WCV',  name:'Elantra 2024',        completedEarnings: 5875.51, bookedEarnings:    0.00, tripEarnings: 5875.51, reimbursements:2479.14, completed:35, booked:0, cancelled:11, days:100, cancelRate:23.9, avgDaily:58.76 },
+  { plate:'NJ #J35WCV',  name:'Elantra 2024',        completedEarnings: 5082.43, bookedEarnings:  321.03, tripEarnings: 5403.46, reimbursements:1112.26, completed:29, booked:1, cancelled:21, days:122, cancelRate:42.0, avgDaily:44.29 },
+  { plate:'NJ #R86WCU',  name:'Elantra 2023',        completedEarnings: 4847.30, bookedEarnings:  420.66, tripEarnings: 5267.96, reimbursements: 424.33, completed:14, booked:2, cancelled: 3, days:158, cancelRate:17.6, avgDaily:33.34 },
+  { plate:'NJ #R85WCU',  name:'Elantra 2024',        completedEarnings: 4811.53, bookedEarnings:  361.75, tripEarnings: 5173.28, reimbursements:1974.76, completed:12, booked:1, cancelled: 5, days:172, cancelRate:29.4, avgDaily:30.08 },
+  { plate:'NJ #Z22UWP',  name:'Elantra 2019',        completedEarnings: 4860.11, bookedEarnings:  797.69, tripEarnings: 5657.80, reimbursements:1056.25, completed:45, booked:3, cancelled:11, days:110, cancelRate:19.6, avgDaily:51.43 },
+  { plate:'NJ #Z22UTY',  name:'Elantra 2020',        completedEarnings: 3906.64, bookedEarnings:  252.00, tripEarnings: 4158.64, reimbursements:1113.55, completed:40, booked:2, cancelled:10, days: 89, cancelRate:20.0, avgDaily:46.73 },
+  { plate:'NJ #D27YBG',  name:'Kia Sportage 2021',   completedEarnings: 2460.15, bookedEarnings:  553.59, tripEarnings: 3013.74, reimbursements: 565.27, completed:20, booked:4, cancelled: 4, days: 52, cancelRate:16.7, avgDaily:57.96 },
+  { plate:'NJ #L10WBR',  name:'Elantra 2024',        completedEarnings: 2758.87, bookedEarnings:    0.00, tripEarnings: 2758.87, reimbursements: 515.53, completed:11, booked:0, cancelled: 6, days:111, cancelRate:35.3, avgDaily:24.85 },
+  { plate:'NJ #D31YBG',  name:'Sonata 2021',         completedEarnings: 2620.28, bookedEarnings:    0.00, tripEarnings: 2620.28, reimbursements: 444.00, completed:17, booked:0, cancelled: 4, days: 46, cancelRate:19.0, avgDaily:56.96 },
+  { plate:'NJ #E52WYD',  name:'Tesla Model 3 2021',  completedEarnings: 1656.42, bookedEarnings:  795.06, tripEarnings: 2451.48, reimbursements: 769.70, completed:11, booked:2, cancelled: 6, days: 58, cancelRate:35.3, avgDaily:42.27 },
+  { plate:'NJ #X37VXJ',  name:'Elantra 2024',        completedEarnings: 1801.38, bookedEarnings:    0.00, tripEarnings: 1801.38, reimbursements: 178.79, completed: 3, booked:0, cancelled: 2, days: 72, cancelRate:40.0, avgDaily:25.02, totalled:true, totalledDate:'2026-01' },
+  { plate:'NJ #H098664', name:'Kia Forte 2023',      completedEarnings: 1134.13, bookedEarnings:  140.05, tripEarnings: 1274.18, reimbursements: 130.69, completed:10, booked:1, cancelled:15, days: 24, cancelRate:60.0, avgDaily:53.09 },
 ];
 
 // Maintenance / service costs per vehicle — manually compiled from the owner's
@@ -805,23 +809,22 @@ let WAVE = {
 };
 // WAVE_DATA_END
 
-// Monthly totals from CSV (2026 trips, Completed + Booked/confirmed upcoming, by trip start date)
-// tripEarnings = Total earnings minus full reimbursements — matches Turo's reporting
-// Sep–Dec show confirmed future bookings only. Total: $83,123 (Turo shows $82,338)
-// Last updated: 2026-08-12 from trip_earnings_export_20260812.csv
+// Monthly totals from CSV (2026 trips, by trip start date)
+// completedEarnings = already earned; bookedEarnings = confirmed upcoming; tripEarnings = total (for charts)
+// Sep–Dec are all booked (future). Last updated: 2026-08-12 from trip_earnings_export_20260812.csv
 let MONTHLY = [
-  { month:'2026-01', label:'Jan', tripEarnings:13180.48, reimbursements:6899.28, completed:52, cancelled:31, days:439 },
-  { month:'2026-02', label:'Feb', tripEarnings: 5357.53, reimbursements:1652.37, completed:46, cancelled:26, days:159 },
-  { month:'2026-03', label:'Mar', tripEarnings: 6865.43, reimbursements:2836.14, completed:37, cancelled:17, days:171 },
-  { month:'2026-04', label:'Apr', tripEarnings: 8644.53, reimbursements:2614.67, completed:53, cancelled:18, days:231 },
-  { month:'2026-05', label:'May', tripEarnings: 8604.30, reimbursements:2038.99, completed:60, cancelled:17, days:154 },
-  { month:'2026-06', label:'Jun', tripEarnings:13173.73, reimbursements:3092.12, completed:79, cancelled:29, days:213 },
-  { month:'2026-07', label:'Jul', tripEarnings:16402.75, reimbursements:3214.71, completed:85, cancelled:32, days:284 },
-  { month:'2026-08', label:'Aug', tripEarnings: 7518.77, reimbursements:  80.07, completed:15, cancelled:11, days:128 },
-  { month:'2026-09', label:'Sep', tripEarnings: 1873.76, reimbursements:   0.00, completed: 0, cancelled: 2, days: 34 },
-  { month:'2026-10', label:'Oct', tripEarnings:  657.60, reimbursements:   0.00, completed: 0, cancelled: 0, days: 14 },
-  { month:'2026-11', label:'Nov', tripEarnings:  100.80, reimbursements:   0.00, completed: 0, cancelled: 0, days:  2 },
-  { month:'2026-12', label:'Dec', tripEarnings:  743.85, reimbursements:   0.00, completed: 0, cancelled: 0, days: 12 },
+  { month:'2026-01', label:'Jan', completedEarnings:13180.48, bookedEarnings:    0.00, tripEarnings:13180.48, reimbursements:6899.28, completed:52, booked: 0, cancelled:31, days:439 },
+  { month:'2026-02', label:'Feb', completedEarnings: 5357.53, bookedEarnings:    0.00, tripEarnings: 5357.53, reimbursements:1652.37, completed:46, booked: 0, cancelled:26, days:159 },
+  { month:'2026-03', label:'Mar', completedEarnings: 6865.43, bookedEarnings:    0.00, tripEarnings: 6865.43, reimbursements:2836.14, completed:37, booked: 0, cancelled:17, days:171 },
+  { month:'2026-04', label:'Apr', completedEarnings: 8644.53, bookedEarnings:    0.00, tripEarnings: 8644.53, reimbursements:2614.67, completed:53, booked: 0, cancelled:18, days:231 },
+  { month:'2026-05', label:'May', completedEarnings: 8604.30, bookedEarnings:    0.00, tripEarnings: 8604.30, reimbursements:2038.99, completed:60, booked: 0, cancelled:17, days:154 },
+  { month:'2026-06', label:'Jun', completedEarnings:13173.73, bookedEarnings:    0.00, tripEarnings:13173.73, reimbursements:3092.12, completed:79, booked: 0, cancelled:29, days:213 },
+  { month:'2026-07', label:'Jul', completedEarnings:16402.75, bookedEarnings:    0.00, tripEarnings:16402.75, reimbursements:3214.71, completed:85, booked: 0, cancelled:32, days:284 },
+  { month:'2026-08', label:'Aug', completedEarnings: 2105.80, bookedEarnings: 5412.97, tripEarnings: 7518.77, reimbursements:  80.07, completed:15, booked:26, cancelled:11, days:128 },
+  { month:'2026-09', label:'Sep', completedEarnings:    0.00, bookedEarnings: 1873.76, tripEarnings: 1873.76, reimbursements:   0.00, completed: 0, booked:10, cancelled: 2, days: 34 },
+  { month:'2026-10', label:'Oct', completedEarnings:    0.00, bookedEarnings:  657.60, tripEarnings:  657.60, reimbursements:   0.00, completed: 0, booked: 3, cancelled: 0, days: 14 },
+  { month:'2026-11', label:'Nov', completedEarnings:    0.00, bookedEarnings:  100.80, tripEarnings:  100.80, reimbursements:   0.00, completed: 0, booked: 1, cancelled: 0, days:  2 },
+  { month:'2026-12', label:'Dec', completedEarnings:    0.00, bookedEarnings:  743.85, tripEarnings:  743.85, reimbursements:   0.00, completed: 0, booked: 1, cancelled: 0, days: 12 },
 ];
 
 // ─── CHARTS ───────────────────────────────────────────────────────────────────
@@ -1089,20 +1092,24 @@ document.querySelector('#ptable thead').addEventListener('click',e=>{
 // ─── KPI UPDATE ────────────────────────────────────────────────────────────────
 
 function updateKPIs() {
-  const totalE = VEHICLES.reduce((s,v)=>s+v.tripEarnings,0);
-  const totalR = VEHICLES.reduce((s,v)=>s+(v.reimbursements||0),0);
-  const totalD = VEHICLES.reduce((s,v)=>s+v.days,0);
-  const totalC = VEHICLES.reduce((s,v)=>s+v.completed,0);
-  const totalX = VEHICLES.reduce((s,v)=>s+v.cancelled,0);
-  const avgRate = totalD>0 ? totalE/totalD : 0;
+  const totalComp  = VEHICLES.reduce((s,v)=>s+(v.completedEarnings||0),0);
+  const totalBook  = VEHICLES.reduce((s,v)=>s+(v.bookedEarnings||0),0);
+  const totalR     = VEHICLES.reduce((s,v)=>s+(v.reimbursements||0),0);
+  const totalD     = VEHICLES.reduce((s,v)=>s+v.days,0);
+  const totalC     = VEHICLES.reduce((s,v)=>s+v.completed,0);
+  const totalX     = VEHICLES.reduce((s,v)=>s+v.cancelled,0);
+  const totalB     = VEHICLES.reduce((s,v)=>s+(v.booked||0),0);
+  const avgRate    = totalD>0 ? totalComp/totalD : 0;
 
-  document.getElementById('kpi-earnings').textContent = $f(totalE);
+  document.getElementById('kpi-earnings').textContent = $f(totalComp);
   document.getElementById('kpi-earnings-sub').textContent = `${totalC} completed · ${totalX} cancelled`;
   document.getElementById('kpi-reimbursements').textContent = `+ ${$f(totalR)} reimbursements (tolls, gas, EV)`;
+  document.getElementById('kpi-booked').textContent = $f(totalBook);
+  document.getElementById('kpi-booked-sub').textContent = `${totalB} confirmed trips ahead`;
   document.getElementById('kpi-days').textContent = totalD.toLocaleString();
   document.getElementById('kpi-days-sub').textContent = `avg ${(totalD/Math.max(1,totalC)).toFixed(1)} days per completed trip`;
   document.getElementById('kpi-avgdaily').textContent = '$'+avgRate.toFixed(2);
-  document.getElementById('kpi-avgdaily-sub').textContent = 'fleet-wide, trip earnings ÷ days rented';
+  document.getElementById('kpi-avgdaily-sub').textContent = 'fleet-wide, earned ÷ days rented';
 }
 
 // ─── MONTH TABS ────────────────────────────────────────────────────────────────
@@ -1162,55 +1169,57 @@ function parseCSV(text) {
     const plate = plateM ? plateM[1] : vehicle;
     const nameM = get(row,'Vehicle name');
 
-    if(!vmap[plate]) vmap[plate]={plate,name:nameM,tripEarnings:0,reimbursements:0,completed:0,booked:0,cancelled:0,days:0,cancelRate:0,avgDaily:0};
+    if(!vmap[plate]) vmap[plate]={plate,name:nameM,completedEarnings:0,bookedEarnings:0,reimbursements:0,completed:0,booked:0,cancelled:0,days:0,cancelRate:0,avgDaily:0};
 
     if(start){
       const d=new Date(start.substring(0,10));
       if(!isNaN(d)&&d.getFullYear()===2026){
         const mk=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-        if(!mmap[mk]) mmap[mk]={month:mk,label:d.toLocaleString('en-US',{month:'short'}),tripEarnings:0,reimbursements:0,completed:0,booked:0,cancelled:0,days:0};
+        if(!mmap[mk]) mmap[mk]={month:mk,label:d.toLocaleString('en-US',{month:'short'}),completedEarnings:0,bookedEarnings:0,reimbursements:0,completed:0,booked:0,cancelled:0,days:0};
         if(status==='Completed'){
-          vmap[plate].tripEarnings+=earn; vmap[plate].reimbursements+=reimb;
+          vmap[plate].completedEarnings+=earn; vmap[plate].reimbursements+=reimb;
           vmap[plate].completed++; vmap[plate].days+=days;
-          mmap[mk].tripEarnings+=earn; mmap[mk].reimbursements+=reimb;
+          mmap[mk].completedEarnings+=earn; mmap[mk].reimbursements+=reimb;
           mmap[mk].completed++; mmap[mk].days+=days;
         } else if(status==='Booked'){
-          // Confirmed upcoming trips — Turo includes these in "Trip earnings"
-          vmap[plate].tripEarnings+=earn; vmap[plate].reimbursements+=reimb;
+          // Confirmed upcoming trips — shown separately as upcoming income
+          vmap[plate].bookedEarnings+=earn; vmap[plate].reimbursements+=reimb;
           vmap[plate].booked++; vmap[plate].days+=days;
-          mmap[mk].tripEarnings+=earn; mmap[mk].reimbursements+=reimb;
+          mmap[mk].bookedEarnings+=earn; mmap[mk].reimbursements+=reimb;
           mmap[mk].booked++; mmap[mk].days+=days;
         } else if(status&&status.toLowerCase().includes('cancellation')){
           vmap[plate].cancelled++;
           mmap[mk].cancelled++;
           if(cancelFee){
-            vmap[plate].tripEarnings+=cancelFee;
-            mmap[mk].tripEarnings+=cancelFee;
+            vmap[plate].completedEarnings+=cancelFee;  // cancel fees are already earned
+            mmap[mk].completedEarnings+=cancelFee;
           }
         }
       }
     } else {
       if(status==='Completed'){
-        vmap[plate].tripEarnings+=earn; vmap[plate].reimbursements+=reimb;
+        vmap[plate].completedEarnings+=earn; vmap[plate].reimbursements+=reimb;
         vmap[plate].completed++; vmap[plate].days+=days;
       } else if(status==='Booked'){
-        vmap[plate].tripEarnings+=earn; vmap[plate].reimbursements+=reimb;
+        vmap[plate].bookedEarnings+=earn; vmap[plate].reimbursements+=reimb;
         vmap[plate].booked++; vmap[plate].days+=days;
       } else if(status&&status.toLowerCase().includes('cancellation')){
         vmap[plate].cancelled++;
-        if(cancelFee) vmap[plate].tripEarnings+=cancelFee;
+        if(cancelFee) vmap[plate].completedEarnings+=cancelFee;
       }
     }
   }
 
   Object.values(vmap).forEach(v=>{
+    v.tripEarnings = v.completedEarnings + v.bookedEarnings; // total for charts
     const t=v.completed+v.cancelled;
     v.cancelRate=t>0?Math.round(v.cancelled/t*1000)/10:0;
-    v.avgDaily=v.days>0?Math.round(v.tripEarnings/v.days*100)/100:0;
+    v.avgDaily=v.completed>0?Math.round(v.completedEarnings/Math.max(1,v.days-Math.round(v.days*v.booked/Math.max(1,v.booked+v.completed)))*100)/100:0;
   });
 
   VEHICLES = Object.values(vmap).filter(v=>v.completed+v.cancelled+v.booked>0).sort((a,b)=>b.tripEarnings-a.tripEarnings);
   MONTHLY  = Object.values(mmap).filter(m=>m.month>='2026-01'&&m.month<='2026-12'&&(m.completed>0||m.cancelled>0||m.booked>0)).sort((a,b)=>a.month>b.month?1:-1);
+  MONTHLY.forEach(m=>{ m.tripEarnings = m.completedEarnings + m.bookedEarnings; });
 
   renderAll();
 }
@@ -1501,58 +1510,6 @@ const DEFAULT_MAINT_URL = 'https://docs.google.com/spreadsheets/d/11qickieom6Esj
   loadMaintenanceSheet(saved);
 })();
 
-// ─── GOOGLE SHEETS TRIP CSV AUTO-FETCH ───────────────────────────────────────
-// Upload your Turo trip export CSV to a public Google Sheet, then link it here.
-// Dashboard will re-parse it on every page load — no manual updates needed.
-// Share the sheet → "Anyone with link can view", then click "Trip Data Sheet".
-
-const TRIP_CSV_KEY = 'turo_trip_csv_url';
-const DEFAULT_TRIP_CSV_URL = ''; // Set via the "Trip Data Sheet" button
-
-function promptTripCSV() {
-  const saved = localStorage.getItem(TRIP_CSV_KEY) || '';
-  const url = window.prompt(
-    'Paste your Google Sheets URL containing the Turo trip export CSV:\n\n' +
-    '1. Export your trips from Turo (Earnings → Export)\n' +
-    '2. Open Google Sheets → File → Import → upload the CSV\n' +
-    '3. File → Share → "Anyone with link can view"\n' +
-    '4. Paste the sheet URL here\n\nThe dashboard will update automatically on each page load.',
-    saved
-  );
-  if (url === null) return;
-  localStorage.setItem(TRIP_CSV_KEY, url);
-  if (url) loadTripCSV(url);
-}
-
-async function loadTripCSV(sheetUrl) {
-  if (!sheetUrl) return;
-  const el = document.getElementById('trip-csv-status');
-  if (el) el.textContent = 'Loading trip data…';
-  try {
-    let csvUrl = sheetUrl;
-    const idMatch = sheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
-    if (idMatch) {
-      const gidMatch = sheetUrl.match(/[?&]gid=(\d+)/);
-      const gid = gidMatch ? '&gid=' + gidMatch[1] : '';
-      csvUrl = `https://docs.google.com/spreadsheets/d/${idMatch[1]}/export?format=csv${gid}`;
-    }
-    const resp = await fetch(csvUrl);
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const text = await resp.text();
-    parseCSV(text);
-    if (el) {
-      el.textContent = '✓ Trip data refreshed — ' + new Date().toLocaleTimeString();
-      el.style.color = '#4ade80';
-    }
-  } catch(e) {
-    if (el) el.textContent = '';
-  }
-}
-
-(function() {
-  const saved = localStorage.getItem(TRIP_CSV_KEY) || DEFAULT_TRIP_CSV_URL;
-  if (saved) loadTripCSV(saved);
-})();
 
 </script>
 </body>
