@@ -56,6 +56,16 @@ query GetBalances($id: ID!) {
 
 
 def load_config():
+    # GitHub Actions / CI: read from environment variables if set
+    env_token = os.environ.get("WAVE_API_TOKEN")
+    env_biz   = os.environ.get("WAVE_BUSINESS_ID")
+    if env_token and env_biz:
+        return {
+            "access_token": env_token,
+            "business_id":  env_biz,
+            "business_name": os.environ.get("WAVE_BUSINESS_NAME", "Tiff Roze LLC"),
+        }
+    # Local development: read from wave_config.json
     with open(CONFIG_PATH) as f:
         return json.load(f)
 

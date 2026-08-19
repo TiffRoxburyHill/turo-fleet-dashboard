@@ -1,0 +1,35 @@
+name: Wave Sync
+
+on:
+  schedule:
+    - cron: '0 * * * *'   # every hour on the hour
+  workflow_dispatch:        # allow manual trigger from GitHub UI
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write       # needed to push the updated index.html
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run Wave sync
+        env:
+          WAVE_API_TOKEN:    ${{ secrets.WAVE_API_TOKEN }}
+          WAVE_BUSINESS_ID:  ${{ secrets.WAVE_BUSINESS_ID }}
+        run: python3 wave_sync.py
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name  "wave-sync[bot]"
+          git config user.email "wave-sync@users.noreply.github.com"
+          git add index.html wave_snapshots/
+          git diff --cached --quiet || git commit -m "chore: Wave sync $(date -u '+%Y-%m-%d %H:%M UTC')"
+          git push

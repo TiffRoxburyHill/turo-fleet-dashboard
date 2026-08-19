@@ -181,6 +181,8 @@ body { background: #0f111a; color: #e2e4f0; font-family: 'Segoe UI', system-ui, 
     <input type="file" id="file-input" accept=".csv" onchange="handleUpload(event)">
     <button class="upload-btn" id="maint-btn" onclick="promptMaintenanceSheet()" title="Pull maintenance costs from a public Google Sheet">🔗 Maintenance Sheet</button>
     <span id="maint-status" style="font-size:11px;color:#6b7094"></span>
+    <button class="upload-btn" onclick="promptTripCSV()" title="Link a Google Sheet with your Turo trip export — auto-refreshes on every page open">🔗 Trip Data Sheet</button>
+    <span id="trip-csv-status" style="font-size:11px;color:#6b7094"></span>
   </div>
 </div>
 
@@ -427,7 +429,7 @@ const NEW_CARS = [];
 // Wave live data — auto-rewritten by wave_sync.py on each scheduled run.
 // WAVE_DATA_START
 let WAVE = {
-  "lastSynced": "2026-08-13T14:00:47.822851+00:00",
+  "lastSynced": "2026-08-17T11:04:49.033523+00:00",
   "accounts": {
     "bank": [
       {
@@ -440,7 +442,7 @@ let WAVE = {
         "id": "QWNjb3VudDoyNDk1OTYxMDI3OTg4OTg1MTE1O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
         "name": "Clearly Better Business Checking (920)",
         "subtype": "Cash & Bank",
-        "balance": 8583.06
+        "balance": 8714.6
       }
     ],
     "income": [
@@ -472,7 +474,7 @@ let WAVE = {
         "id": "QWNjb3VudDoyNDk1OTY1NzI0NjAyODMyNjQ5O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
         "name": "Turo",
         "subtype": "Income",
-        "balance": 93647.27
+        "balance": 94799.39
       },
       {
         "id": "QWNjb3VudDoyNDk1OTU3OTIxMjY4MDEyMTYxO0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
@@ -510,7 +512,7 @@ let WAVE = {
         "id": "QWNjb3VudDoyNDk1OTgyNzgwNTEzNTU2MjU2O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
         "name": "Car Loan Amex",
         "subtype": "Expense",
-        "balance": 6101.9
+        "balance": 7115.48
       },
       {
         "id": "QWNjb3VudDoyNDk1OTgyMjg4NzIzMDIzNDYyO0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
@@ -708,7 +710,7 @@ let WAVE = {
         "id": "QWNjb3VudDoyNDk1OTU3OTIxMzYwMjg2ODUzO0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
         "name": "Uncategorized Expense",
         "subtype": "Uncategorized Expense",
-        "balance": 341700.95
+        "balance": 341707.95
       },
       {
         "id": "QWNjb3VudDoyNDk1OTU3OTIyNzE5MjQxNDA3O0J1c2luZXNzOjE5M2RjOWZjLWRjMjItNGE0Mi1iYWYyLWY0MjJmNzYzOTMxMQ==",
@@ -804,6 +806,11 @@ let WAVE = {
       "weekEnding": "2026-08-13",
       "incomeDelta": 1982.94,
       "expenseDelta": 307.34
+    },
+    {
+      "weekEnding": "2026-08-17",
+      "incomeDelta": 1152.12,
+      "expenseDelta": 1020.58
     }
   ]
 };
@@ -1508,6 +1515,55 @@ const DEFAULT_MAINT_URL = 'https://docs.google.com/spreadsheets/d/11qickieom6Esj
 (function() {
   const saved = localStorage.getItem(MAINT_KEY) || DEFAULT_MAINT_URL;
   loadMaintenanceSheet(saved);
+})();
+
+// ─── GOOGLE SHEETS TRIP CSV AUTO-FETCH ───────────────────────────────────────
+// Upload your Turo trip export CSV to a public Google Sheet, then click
+// "Trip Data Sheet" and paste the URL once. Dashboard re-parses on every open.
+
+const TRIP_CSV_KEY = 'turo_trip_csv_url';
+
+function promptTripCSV() {
+  const saved = localStorage.getItem(TRIP_CSV_KEY) || '';
+  const url = window.prompt(
+    'Paste your Google Sheets URL containing the Turo trip export CSV:\n\n' +
+    '1. Export trips from Turo (Earnings → Export)\n' +
+    '2. Google Sheets → File → Import → upload the CSV\n' +
+    '3. File → Share → "Anyone with link can view"\n' +
+    '4. Paste the sheet URL here\n\nThe dashboard will auto-refresh from it on every page open.',
+    saved
+  );
+  if (url === null) return;
+  localStorage.setItem(TRIP_CSV_KEY, url);
+  if (url) loadTripCSV(url);
+}
+
+async function loadTripCSV(sheetUrl) {
+  if (!sheetUrl) return;
+  const el = document.getElementById('trip-csv-status');
+  if (el) el.textContent = 'Loading trip data…';
+  try {
+    let csvUrl = sheetUrl;
+    const idMatch = sheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+    if (idMatch) {
+      const gidMatch = sheetUrl.match(/[?&]gid=(\d+)/);
+      const gid = gidMatch ? '&gid=' + gidMatch[1] : '';
+      csvUrl = `https://docs.google.com/spreadsheets/d/${idMatch[1]}/export?format=csv${gid}`;
+    }
+    const resp = await fetch(csvUrl);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const text = await resp.text();
+    parseCSV(text);
+    if (el) { el.textContent = '✓ Live — ' + new Date().toLocaleTimeString(); el.style.color = '#4ade80'; }
+  } catch(e) {
+    if (el) { el.textContent = '⚠ Sheet unavailable'; el.style.color = '#f87171'; }
+  }
+}
+
+// Auto-fetch on every page open if a URL has been saved
+(function() {
+  const saved = localStorage.getItem(TRIP_CSV_KEY);
+  if (saved) loadTripCSV(saved);
 })();
 
 
